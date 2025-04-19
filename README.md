@@ -17,3 +17,42 @@ Computational Intelligence Lab
 ## Roadmap
 
 - [ ] Plan Project
+
+## Get Started
+
+### Create Virtual Environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Download Dataset
+
+And put it inside `./data`.
+
+### Train
+
+```bash
+python3 main.py fit -c configs/example.yaml
+```
+
+Monitor using TensorBoard:
+
+```bash
+tensorboard --logdir logs
+```
+
+### Test
+
+TODO: I'll check how to do this properly.
+
+```bash
+python3 main.py test -c configs/example.yaml
+```
