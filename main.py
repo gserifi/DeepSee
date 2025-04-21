@@ -1,5 +1,6 @@
-from lightning.pytorch.cli import ArgsType, LightningCLI
 from datetime import datetime
+
+from lightning.pytorch.cli import ArgsType, LightningCLI
 
 from base_model import LitBaseModel
 from data_module import LitDataModule

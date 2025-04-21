@@ -1,10 +1,11 @@
-import lightning as lit
-from torch.utils.data import Dataset, DataLoader
-from typing import List, Tuple
 from pathlib import Path
-from PIL import Image
-import torch
+from typing import List, Tuple
+
+import lightning as lit
 import numpy as np
+import torch
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset
 
 
 class ImageAndDepthDataset(Dataset):
