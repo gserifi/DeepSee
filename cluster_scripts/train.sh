@@ -9,4 +9,4 @@ sbatch \
 --job-name="$2" \
 --mem-per-cpu=4096 \
 --mail-type=END \
---wrap="python3 main.py fit -c $2"
+--wrap="python3 main.py fit -c configs/$2.yaml"
