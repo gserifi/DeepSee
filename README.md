@@ -51,8 +51,13 @@ tensorboard --logdir logs
 
 ### Test
 
-TODO: I'll check how to do this properly.
+```bash
+python3 main.py test -c configs/example.yaml --ckpt_path <path_to_checkpoint>
+```
+
+### Inference
 
 ```bash
-python3 main.py test -c configs/example.yaml
+python3 main.py predict -c configs/example.yaml --ckpt_path <path_to_checkpoint>
+python3 data/create_prediction_csv.py
 ```
