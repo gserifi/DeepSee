@@ -1,6 +1,6 @@
 # lightning.pytorch==2.5.1
 seed_everything: 0
-model: Dummy
+model: DinoBackbone
 data:
   data_root: data
   batch_size: 32

@@ -1,1 +1,1 @@
-from models.dummy import Dummy
+from models.dino_backbone import DinoBackbone
