@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import lightning as lit
 import numpy as np
@@ -7,8 +7,16 @@ import torch
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 
+ImageAndDepthDatasetItemType = Tuple[torch.Tensor, Union[torch.Tensor, str]]
 
-class ImageAndDepthDataset(Dataset):
+
+class ImageAndDepthDataset(Dataset[ImageAndDepthDatasetItemType]):
+    """
+    Dataset for loading images and depth maps. __getitem__ returns a tuple of (image, depth), where image is always a
+    tensor and depth may be either a tensor or a string denoting the path to the depth file (if ground truth is not
+    available, e.g. for the prediction set).
+    """
+
     def __init__(self, image_dir: Path, image_list: List[Tuple[str, str]]):
         self.image_dir = image_dir
         self.image_list = image_list
@@ -33,7 +41,7 @@ class ImageAndDepthDataset(Dataset):
 
         return dp
 
-    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx) -> ImageAndDepthDatasetItemType:
         image_path, depth_path = self.image_list[idx]
         image = ImageAndDepthDataset.load_image(self.image_dir / image_path)
         depth = ImageAndDepthDataset.load_depth(self.image_dir / depth_path)
@@ -45,6 +53,10 @@ class ImageAndDepthDataset(Dataset):
 
 
 class LitDataModule(lit.LightningDataModule):
+    """
+    Data module for loading image and depth datasets. See `ImageAndDepthDataset` for details.
+    """
+
     train_list: List[Tuple[str, str]]
     val_list: List[Tuple[str, str]]
     test_list: List[Tuple[str, str]]
@@ -58,12 +70,12 @@ class LitDataModule(lit.LightningDataModule):
     def __init__(
         self,
         data_root: Path = Path("./data"),
-        batch_size=32,
-        num_workers=4,
-        persistent_workers=True,
-        pin_memory=True,
-        train_split=0.8,
-        holdout_split=0.5,
+        batch_size: int = 32,
+        num_workers: int = 4,
+        persistent_workers: bool = True,
+        pin_memory: bool = True,
+        train_split: float = 0.7,  # 70% train, 30% val + split
+        holdout_split: float = 0.33,  # 33% val, 67% test
     ):
         super().__init__()
         self.data_root = data_root
@@ -115,7 +127,9 @@ class LitDataModule(lit.LightningDataModule):
             self.data_root / "test" / "test", self.predict_list
         )
 
-    def dataloader(self, dataset, shuffle: bool = False):
+    def dataloader(
+        self, dataset: ImageAndDepthDataset, shuffle: bool = False
+    ) -> DataLoader[ImageAndDepthDatasetItemType]:
         return DataLoader(
             dataset,
             batch_size=self.batch_size,
@@ -125,14 +139,14 @@ class LitDataModule(lit.LightningDataModule):
             pin_memory=self.pin_memory,
         )
 
-    def train_dataloader(self):
+    def train_dataloader(self) -> DataLoader[ImageAndDepthDatasetItemType]:
         return self.dataloader(self.train_dataset, shuffle=True)
 
-    def val_dataloader(self):
+    def val_dataloader(self) -> DataLoader[ImageAndDepthDatasetItemType]:
         return self.dataloader(self.val_dataset, shuffle=False)
 
-    def test_dataloader(self):
+    def test_dataloader(self) -> DataLoader[ImageAndDepthDatasetItemType]:
         return self.dataloader(self.test_dataset, shuffle=False)
 
-    def predict_dataloader(self):
+    def predict_dataloader(self) -> DataLoader[ImageAndDepthDatasetItemType]:
         return self.dataloader(self.predict_dataset, shuffle=False)

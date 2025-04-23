@@ -1,10 +1,14 @@
 from pathlib import Path
+from typing import Dict, List
 
 import lightning as lit
 import numpy as np
-from torch import nn
+import torch
+from torch import nn, optim
+from torchvision.transforms.functional import to_pil_image
 from torchvision.utils import make_grid
 
+from data_module import ImageAndDepthDatasetItemType
 from utils import compute_metrics
 
 PREDICTIONS_DIR = Path("./data/predictions")
@@ -17,19 +21,26 @@ class LitBaseModel(lit.LightningModule):
         self.loss_fn = nn.MSELoss()
         self.loss_fn.eval()
 
-        self.train_metrics = []
-        self.val_metrics = []
-        self.test_metrics = []
+        self.train_metrics: List[Dict[str, float]] = []
+        self.val_metrics: List[Dict[str, float]] = []
+        self.test_metrics: List[Dict[str, float]] = []
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError(
             "Forward method not implemented. Should be implemented by subclass."
         )
 
-    def log_batch_images(self, image, gt_depth, pred_depth, stage, n=8):
-        image_grid = make_grid(image[:n], nrow=4, normalize=True)
-        gt_depth_grid = make_grid(gt_depth[:n], nrow=4, normalize=True)
-        pred_depth_grid = make_grid(pred_depth[:n], nrow=4, normalize=True)
+    def log_batch_images(
+        self,
+        image: torch.Tensor,
+        gt_depth: torch.Tensor,
+        pred_depth: torch.Tensor,
+        stage: str,
+        num_samples: int = 8,
+    ):
+        image_grid = make_grid(image[:num_samples], nrow=4, normalize=True)
+        gt_depth_grid = make_grid(gt_depth[:num_samples], nrow=4, normalize=True)
+        pred_depth_grid = make_grid(pred_depth[:num_samples], nrow=4, normalize=True)
 
         self.logger.experiment.add_image(f"{stage}/image", image_grid, self.global_step)
 
@@ -42,7 +53,7 @@ class LitBaseModel(lit.LightningModule):
         )
 
     @staticmethod
-    def agg_metrics(metrics, stage):
+    def agg_metrics(metrics: List[Dict[str, float]], stage: str) -> Dict[str, float]:
         total_samples = sum(m["num_samples"] for m in metrics)
         total_pixels = sum(m["num_pixels"] for m in metrics)
 
@@ -68,7 +79,7 @@ class LitBaseModel(lit.LightningModule):
 
         return {f"{stage}/{k}": v for k, v in agg_dict.items()}
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch: ImageAndDepthDatasetItemType, batch_idx: int):
         image, gt_depth = batch
         pred_depth = self.forward(image)
 
@@ -88,7 +99,12 @@ class LitBaseModel(lit.LightningModule):
 
         self.train_metrics.clear()
 
-    def validation_step(self, batch, batch_idx, skip_log=False):
+    def validation_step(
+        self,
+        batch: ImageAndDepthDatasetItemType,
+        batch_idx: int,
+        skip_log: bool = False,
+    ):
         image, gt_depth = batch
         pred_depth = self.forward(image)
 
@@ -109,7 +125,7 @@ class LitBaseModel(lit.LightningModule):
 
         self.val_metrics.clear()
 
-    def test_step(self, batch, batch_idx):
+    def test_step(self, batch: ImageAndDepthDatasetItemType, batch_idx: int):
         image, gt_depth = batch
         pred_depth = self.forward(image)
 
@@ -123,12 +139,18 @@ class LitBaseModel(lit.LightningModule):
 
         self.test_metrics.clear()
 
-    def predict_step(self, batch, batch_idx):
+    def predict_step(self, batch: ImageAndDepthDatasetItemType, batch_idx: int):
         image, filename = batch
         pred_depth = self.forward(image)
 
-        pred_depth = pred_depth.squeeze(1).cpu().numpy()
+        pred_depth = pred_depth.squeeze(1).cpu()
 
         PREDICTIONS_DIR.mkdir(exist_ok=True)
         for pred, name in zip(pred_depth, filename):
-            np.save(PREDICTIONS_DIR / name, pred)
+            depth_im = to_pil_image(make_grid([pred], nrow=1, normalize=True))
+            depth_im.save(PREDICTIONS_DIR / name.replace(".npy", ".png"))
+            np.save(PREDICTIONS_DIR / name, pred.numpy())
+
+    def configure_optimizers(self) -> optim.Optimizer:
+        optimizer = optim.Adam(self.parameters())
+        return optimizer
