@@ -1,42 +1,17 @@
+from typing import Sequence
+
 import torch
 import torch.nn.functional as F
-from torch import nn, optim
-from transformers import AutoImageProcessor, Dinov2WithRegistersBackbone
+from torch import nn
 
-from base_model import LitBaseModel
+from models.base_decoder import BaseDecoder
 
 
-class DinoBackbone(LitBaseModel):
-    """
-    Uses DINOv2 with registers (https://huggingface.co/docs/transformers/en/model_doc/dinov2_with_registers) as a
-    feature extractor. The features are on a per-patch level and the depth is predicted using a UNet style decoder.
-    """
+class UNetDecoder(BaseDecoder):
+    def __init__(self, feature_shape: Sequence[int]):
+        super().__init__(feature_shape)
 
-    def __init__(self, dino_model: str = "facebook/dinov2-with-registers-base"):
-        """
-        :param dino_model: For other options, see https://huggingface.co/models?search=facebook/dino
-        """
-
-        super().__init__()
-
-        # Load the image processor that transforms the input images into the format expected by the DINOv2 model
-        self.image_processor = AutoImageProcessor.from_pretrained(
-            dino_model, use_fast=True
-        )
-
-        # Layer names to extract features from
-        self.out_features = ["stage2", "stage5", "stage8", "stage11"]
-
-        # Load the DINOv2 model with registers
-        self.dino = Dinov2WithRegistersBackbone.from_pretrained(
-            dino_model, out_features=self.out_features
-        )
-
-        self.patch_size: int = self.dino.config.patch_size
-        self.hidden_size: int = self.dino.config.hidden_size
-        self.num_features = len(self.out_features)
-
-        self.feat_channels = self.num_features * self.hidden_size
+        self.feat_channels: int = self.feature_shape[0]
 
         # Define UNet decoder layers
         # For images of shape (B, 3, 224, 224), the output of the image processor, features are (B, N * 768, 16, 16)
@@ -74,27 +49,17 @@ class DinoBackbone(LitBaseModel):
             padding=0,
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, feats: torch.Tensor) -> torch.Tensor:
         """
-        Forward pass through the model. The input is a batch of images and the output is a depth map of the same shape.
         :param x: Input images of shape (B, 3, H, W)
+        :param feats: Feature maps with self.feat_channels channels
         :return: Depth map of shape (B, 1, H, W)
         """
 
-        # Transform images to the right format
-        inputs = self.image_processor(images=x, return_tensors="pt", do_rescale=False)
-        inputs = {k: v.to(x.device) for k, v in inputs.items()}
-
-        # Extract features from the DINOv2 model
-        outputs = self.dino(**inputs)
-        feat_maps = torch.cat(outputs.feature_maps, dim=1)
-
         # At each step, downsample the input image to the size of the feature maps at that level and run the
         # concatenation through a convolutional layer, followed by upsampling and activation
-        x1 = F.interpolate(
-            x, size=feat_maps.shape[2:], mode="bicubic", align_corners=False
-        )
-        d1 = self.bn1(self.conv1(torch.cat([x1, feat_maps], dim=1)))
+        x1 = F.interpolate(x, size=feats.shape[2:], mode="bicubic", align_corners=False)
+        d1 = self.bn1(self.conv1(torch.cat([x1, feats], dim=1)))
         d1 = self.up1(d1)
         d1 = F.gelu(d1)
 

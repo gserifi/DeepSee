@@ -1,6 +1,16 @@
 # lightning.pytorch==2.5.1
 seed_everything: 0
-model: DinoBackbone
+model:
+  class_path: FeatureDecoder
+  init_args:
+    feature_extractor:
+      class_path: DinoFeatureExtractor
+      init_args:
+        out_features: [stage2, stage5, stage8, stage11]
+    decoder:
+      class_path: UNetDecoder
+      init_args:
+        feature_shape: [3072, 16, 16] # 3'072 = 4 * 768 feature channels
 data:
   data_root: data
   batch_size: 32
