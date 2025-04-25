@@ -8,7 +8,7 @@ from torch import nn, optim
 from torchvision.transforms.functional import to_pil_image
 from torchvision.utils import make_grid
 
-from data_module import ImageAndDepthDatasetItemType
+from data_module import ImageAndDepthDatasetItem
 from utils import compute_metrics
 
 PREDICTIONS_DIR = Path("./data/predictions")
@@ -79,7 +79,7 @@ class LitBaseModel(lit.LightningModule):
 
         return {f"{stage}/{k}": v for k, v in agg_dict.items()}
 
-    def training_step(self, batch: ImageAndDepthDatasetItemType, batch_idx: int):
+    def training_step(self, batch: ImageAndDepthDatasetItem, batch_idx: int):
         image, gt_depth = batch
         pred_depth = self.forward(image)
 
@@ -101,7 +101,7 @@ class LitBaseModel(lit.LightningModule):
 
     def validation_step(
         self,
-        batch: ImageAndDepthDatasetItemType,
+        batch: ImageAndDepthDatasetItem,
         batch_idx: int,
         skip_log: bool = False,
     ):
@@ -125,7 +125,7 @@ class LitBaseModel(lit.LightningModule):
 
         self.val_metrics.clear()
 
-    def test_step(self, batch: ImageAndDepthDatasetItemType, batch_idx: int):
+    def test_step(self, batch: ImageAndDepthDatasetItem, batch_idx: int):
         image, gt_depth = batch
         pred_depth = self.forward(image)
 
@@ -139,7 +139,7 @@ class LitBaseModel(lit.LightningModule):
 
         self.test_metrics.clear()
 
-    def predict_step(self, batch: ImageAndDepthDatasetItemType, batch_idx: int):
+    def predict_step(self, batch: ImageAndDepthDatasetItem, batch_idx: int):
         image, filename = batch
         pred_depth = self.forward(image)
 

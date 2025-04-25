@@ -7,10 +7,10 @@ import torch
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 
-ImageAndDepthDatasetItemType = Tuple[torch.Tensor, Union[torch.Tensor, str]]
+ImageAndDepthDatasetItem = Tuple[torch.Tensor, Union[torch.Tensor, str]]
 
 
-class ImageAndDepthDataset(Dataset[ImageAndDepthDatasetItemType]):
+class ImageAndDepthDataset(Dataset[ImageAndDepthDatasetItem]):
     """
     Dataset for loading images and depth maps. __getitem__ returns a tuple of (image, depth), where image is always a
     tensor and depth may be either a tensor or a string denoting the path to the depth file (if ground truth is not
@@ -41,7 +41,7 @@ class ImageAndDepthDataset(Dataset[ImageAndDepthDatasetItemType]):
 
         return dp
 
-    def __getitem__(self, idx) -> ImageAndDepthDatasetItemType:
+    def __getitem__(self, idx) -> ImageAndDepthDatasetItem:
         image_path, depth_path = self.image_list[idx]
         image = ImageAndDepthDataset.load_image(self.image_dir / image_path)
         depth = ImageAndDepthDataset.load_depth(self.image_dir / depth_path)
@@ -129,7 +129,7 @@ class LitDataModule(lit.LightningDataModule):
 
     def dataloader(
         self, dataset: ImageAndDepthDataset, shuffle: bool = False
-    ) -> DataLoader[ImageAndDepthDatasetItemType]:
+    ) -> DataLoader[ImageAndDepthDatasetItem]:
         return DataLoader(
             dataset,
             batch_size=self.batch_size,
@@ -139,14 +139,14 @@ class LitDataModule(lit.LightningDataModule):
             pin_memory=self.pin_memory,
         )
 
-    def train_dataloader(self) -> DataLoader[ImageAndDepthDatasetItemType]:
+    def train_dataloader(self) -> DataLoader[ImageAndDepthDatasetItem]:
         return self.dataloader(self.train_dataset, shuffle=True)
 
-    def val_dataloader(self) -> DataLoader[ImageAndDepthDatasetItemType]:
+    def val_dataloader(self) -> DataLoader[ImageAndDepthDatasetItem]:
         return self.dataloader(self.val_dataset, shuffle=False)
 
-    def test_dataloader(self) -> DataLoader[ImageAndDepthDatasetItemType]:
+    def test_dataloader(self) -> DataLoader[ImageAndDepthDatasetItem]:
         return self.dataloader(self.test_dataset, shuffle=False)
 
-    def predict_dataloader(self) -> DataLoader[ImageAndDepthDatasetItemType]:
+    def predict_dataloader(self) -> DataLoader[ImageAndDepthDatasetItem]:
         return self.dataloader(self.predict_dataset, shuffle=False)

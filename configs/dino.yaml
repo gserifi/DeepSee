@@ -6,7 +6,7 @@ model:
     feature_extractor:
       class_path: DinoFeatureExtractor
       init_args:
-        out_features: [stage2, stage5, stage8, stage11]
+        out_features: ["stage2", "stage5", "stage8", "stage11"]
     decoder:
       class_path: UNetDecoder
       init_args:
