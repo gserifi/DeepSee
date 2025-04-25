@@ -1,0 +1,12 @@
+# lightning.pytorch==2.5.1
+seed_everything: 1337
+model:
+  class_path: PretrainedDepthAnythingV2
+  init_args: {} # no initial arguments, as already pretrained
+data:
+  data_root: data
+  batch_size: 32
+  num_workers: 4
+  persistent_workers: true
+  pin_memory: true
+ckpt_path: null
