@@ -8,7 +8,7 @@ from base_model import ImageAndDepthDatasetItemType, LitBaseModel
 
 class PretrainedDepthAnythingV2(LitBaseModel):
     """
-    Uses pretrained Depth-Anything-V2-Base (https://huggingface.co/depth-anything/Depth-Anything-V2-Base-hf) for full
+    Uses pretrained Depth-Anything-V2-Base (depth-anything/Depth-Anything-V2-Metric-Indoor-Base-hf) for full
     inference. This model should not be trained.
     """
 
@@ -16,10 +16,10 @@ class PretrainedDepthAnythingV2(LitBaseModel):
         super().__init__()
 
         self.image_processor = AutoImageProcessor.from_pretrained(
-            "depth-anything/Depth-Anything-V2-Base-hf"
+            "depth-anything/Depth-Anything-V2-Metric-Indoor-Base-hf"
         )
         self.model = AutoModelForDepthEstimation.from_pretrained(
-            "depth-anything/Depth-Anything-V2-Base-hf"
+            "depth-anything/Depth-Anything-V2-Metric-Indoor-Base-hf"
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
