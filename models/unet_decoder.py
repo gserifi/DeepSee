@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Sequence, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -49,12 +49,8 @@ class UNetDecoder(BaseDecoder):
             padding=0,
         )
 
-    def forward(self, x: torch.Tensor, feats: torch.Tensor) -> torch.Tensor:
-        """
-        :param x: Input images of shape (B, 3, H, W)
-        :param feats: Feature maps with self.feat_channels channels
-        :return: Depth map of shape (B, 1, H, W)
-        """
+    def forward(self, x: torch.Tensor, feats: Tuple[torch.Tensor]) -> torch.Tensor:
+        feats = torch.cat(feats, dim=1)
 
         # At each step, downsample the input image to the size of the feature maps at that level and run the
         # concatenation through a convolutional layer, followed by upsampling and activation

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 
 import torch
 from transformers import AutoImageProcessor, Dinov2WithRegistersBackbone
@@ -44,13 +44,11 @@ class DinoFeatureExtractor(BaseFeatureExtractor):
 
         self.feat_channels = self.num_features * self.hidden_size
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor]:
         # Transform images to the right format
         inputs = self.image_processor(images=x, return_tensors="pt", do_rescale=False)
         inputs = {k: v.to(x.device) for k, v in inputs.items()}
 
         # Extract features from the DINOv2 model
         outputs = self.dino(**inputs)
-        feat_maps = torch.cat(outputs.feature_maps, dim=1)
-
-        return feat_maps
+        return outputs.feature_maps
