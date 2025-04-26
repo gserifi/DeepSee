@@ -1,5 +1,6 @@
 from models.base_decoder import BaseDecoder
 from models.base_feature_extractor import BaseFeatureExtractor
 from models.dino_feature_extractor import DinoFeatureExtractor
+from models.dpt_decoder import DPTDecoder
 from models.feature_decoder import FeatureDecoder
 from models.unet_decoder import UNetDecoder
