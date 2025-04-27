@@ -12,15 +12,17 @@ class PretrainedDepthAnythingV2(LitBaseModel):
     inference. This model should not be trained.
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        depth_anything_model: str = "depth-anything/Depth-Anything-V2-Metric-Indoor-Base-hf",
+    ):
+        """
+        :param depth_anything_model: For other options, see https://huggingface.co/models?search=depth-anything
+        """
         super().__init__()
 
-        self.image_processor = AutoImageProcessor.from_pretrained(
-            "depth-anything/Depth-Anything-V2-Metric-Indoor-Base-hf"
-        )
-        self.model = AutoModelForDepthEstimation.from_pretrained(
-            "depth-anything/Depth-Anything-V2-Metric-Indoor-Base-hf"
-        )
+        self.image_processor = AutoImageProcessor.from_pretrained(depth_anything_model)
+        self.model = AutoModelForDepthEstimation.from_pretrained(depth_anything_model)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Transform images to the right format

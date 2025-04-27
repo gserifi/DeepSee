@@ -1,5 +1,5 @@
 # lightning.pytorch==2.5.1
-seed_everything: 1337
+seed_everything: 0
 model:
   class_path: PretrainedDepthAnythingV2
   init_args: {} # no initial arguments, as already pretrained
