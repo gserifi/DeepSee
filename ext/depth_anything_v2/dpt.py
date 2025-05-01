@@ -143,8 +143,12 @@ class DPTHead(nn.Module):
             #     x = self.readout_projects[i](torch.cat((x, readout), -1))
             # else:
             #     x = x[0]
-            #
-            # x = x.permute(0, 2, 1).reshape((x.shape[0], x.shape[-1], patch_h, patch_w))
+
+            x = (
+                x.permute(0, 2, 1)
+                .reshape((x.shape[0], x.shape[-1], patch_h, patch_w))
+                .contiguous()
+            )
 
             x = self.projects[i](x)
             x = self.resize_layers[i](x)

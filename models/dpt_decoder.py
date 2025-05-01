@@ -17,7 +17,7 @@ class DPTDecoder(BaseDecoder):
 
         self.depth_head = DPTHead(self.feat_channels, use_bn=True)
 
-    def forward(self, x: torch.Tensor, feats: Tuple[torch.Tensor]) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, feats: Tuple[torch.Tensor, ...]) -> torch.Tensor:
         depth = self.depth_head(feats, self.patch_h, self.patch_w)
 
         depth = F.interpolate(

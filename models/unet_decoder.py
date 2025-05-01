@@ -49,7 +49,7 @@ class UNetDecoder(BaseDecoder):
             padding=0,
         )
 
-    def forward(self, x: torch.Tensor, feats: Tuple[torch.Tensor]) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, feats: Tuple[torch.Tensor, ...]) -> torch.Tensor:
         feats = torch.cat(feats, dim=1)
 
         # At each step, downsample the input image to the size of the feature maps at that level and run the

@@ -17,7 +17,7 @@ class BaseDecoder(lit.LightningModule):
         self.save_hyperparameters()
         self.feature_shape = feature_shape
 
-    def forward(self, x: torch.Tensor, feats: Tuple[torch.Tensor]) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, feats: Tuple[torch.Tensor, ...]) -> torch.Tensor:
         """
         :param x: Input images of shape (B, 3, H, W)
         :param feats: Tuple of feature maps of shape (B, FD, PH, PW)
