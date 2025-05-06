@@ -41,12 +41,25 @@ class FeatureDecoder(LitBaseModel):
         return depth
 
     def configure_optimizers(self) -> optim.Optimizer:
-        if self.freeze_extractor:
-            for param in self.feature_extractor.parameters():
-                param.requires_grad = False
+        # if self.freeze_extractor:
+        #     for param in self.feature_extractor.parameters():
+        #         param.requires_grad = False
+        #
+        #     optimizer = optim.Adam(self.decoder.parameters(), lr=1000)
+        # else:
+        #     optimizer = optim.Adam(self.parameters(), lr=1000)
 
-            optimizer = optim.Adam(self.decoder.parameters())
-        else:
-            optimizer = optim.Adam(self.parameters())
+        lr = 0.000005
+        optimizer = optim.AdamW(
+            [
+                {
+                    "params": self.decoder.parameters(),
+                    "lr": lr * 10.0,
+                },
+            ],
+            lr=lr,
+            betas=(0.9, 0.999),
+            weight_decay=0.01,
+        )
 
         return optimizer

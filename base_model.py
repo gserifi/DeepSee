@@ -18,7 +18,7 @@ class LitBaseModel(lit.LightningModule):
     def __init__(self):
         super().__init__()
         self.save_hyperparameters()
-        self.loss_fn = nn.MSELoss()
+        self.loss_fn = nn.SmoothL1Loss()
         self.loss_fn.eval()
 
         self.train_metrics: List[Dict[str, float]] = []

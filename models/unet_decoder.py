@@ -50,7 +50,16 @@ class UNetDecoder(BaseDecoder):
         )
 
     def forward(self, x: torch.Tensor, feats: Tuple[torch.Tensor, ...]) -> torch.Tensor:
-        feats = torch.cat(feats, dim=1)
+        feats = torch.cat(feats, dim=-1)
+        print(feats.shape)
+        feats = feats.permute(0, 2, 1).reshape(
+            (
+                feats.shape[0],
+                feats.shape[-1],
+                self.feature_shape[1],
+                self.feature_shape[2],
+            )
+        )
 
         # At each step, downsample the input image to the size of the feature maps at that level and run the
         # concatenation through a convolutional layer, followed by upsampling and activation

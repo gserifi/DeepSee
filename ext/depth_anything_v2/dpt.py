@@ -17,7 +17,7 @@ from ext.depth_anything_v2.blocks import FeatureFusionBlock, _make_scratch
 def _make_fusion_block(features, use_bn, size=None):
     return FeatureFusionBlock(
         features,
-        nn.GELU(),
+        nn.ReLU(),
         deconv=False,
         bn=use_bn,
         expand=False,
@@ -33,7 +33,7 @@ class ConvBlock(nn.Module):
         self.conv_block = nn.Sequential(
             nn.Conv2d(in_feature, out_feature, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(out_feature),
-            nn.GELU(),
+            nn.ReLU(),
         )
 
     def forward(self, x):
@@ -97,7 +97,7 @@ class DPTHead(nn.Module):
             self.readout_projects = nn.ModuleList()
             for _ in range(len(self.projects)):
                 self.readout_projects.append(
-                    nn.Sequential(nn.Linear(2 * in_channels, in_channels), nn.GELU())
+                    nn.Sequential(nn.Linear(2 * in_channels, in_channels), nn.ReLU())
                 )
 
         self.scratch = _make_scratch(
@@ -128,10 +128,11 @@ class DPTHead(nn.Module):
                 stride=1,
                 padding=1,
             ),
-            nn.GELU(),
+            nn.ReLU(),
             nn.Conv2d(head_features_2, 1, kernel_size=1, stride=1, padding=0),
-            nn.GELU(),
-            nn.Identity(),
+            # nn.ReLU(),
+            # nn.Identity(),
+            nn.Sigmoid(),
         )
 
     def forward(self, out_features, patch_h, patch_w):
