@@ -4,6 +4,7 @@ from typing import Dict, List
 import lightning as lit
 import numpy as np
 import torch
+from matplotlib import cm
 from torch import nn, optim
 from torchvision.transforms.functional import to_pil_image
 from torchvision.utils import make_grid
@@ -38,12 +39,31 @@ class LitBaseModel(lit.LightningModule):
         image: torch.Tensor,
         gt_depth: torch.Tensor,
         pred_depth: torch.Tensor,
+        pred_logvar: torch.Tensor,
         stage: str,
         num_samples: int = 8,
     ):
         image_grid = make_grid(image[:num_samples], nrow=4, normalize=True)
         gt_depth_grid = make_grid(gt_depth[:num_samples], nrow=4, normalize=True)
         pred_depth_grid = make_grid(pred_depth[:num_samples], nrow=4, normalize=True)
+
+        pred_std = torch.exp(0.5 * pred_logvar[:num_samples])
+        pred_std = (pred_std - pred_std.min()) / (
+            pred_std.max() - pred_std.min() + 1e-8
+        )
+        viridis_cmap = cm.get_cmap("viridis")
+        pred_std = (
+            torch.from_numpy(
+                viridis_cmap(
+                    pred_std.permute(0, 2, 3, 1).squeeze(-1).detach().cpu().numpy()
+                )
+            )
+            .to(pred_std)
+            .permute(0, 3, 1, 2)[:, :3, :, :]
+        )
+        pred_std_grid = make_grid(pred_std, nrow=4, normalize=True)
+        std_opacity = 0.7
+        pred_std_grid = std_opacity * pred_std_grid + (1 - std_opacity) * image_grid
 
         self.logger.experiment.add_image(f"{stage}/image", image_grid, self.global_step)
 
@@ -53,6 +73,10 @@ class LitBaseModel(lit.LightningModule):
 
         self.logger.experiment.add_image(
             f"{stage}/pred_depth", pred_depth_grid, self.global_step
+        )
+
+        self.logger.experiment.add_image(
+            f"{stage}/pred_std", pred_std_grid, self.global_step
         )
 
     @staticmethod
@@ -91,7 +115,9 @@ class LitBaseModel(lit.LightningModule):
         self.log("train/loss", loss, prog_bar=True, on_step=True, on_epoch=False)
 
         if (self.global_step + 1) % self.trainer.log_every_n_steps == 0:
-            self.log_batch_images(image, gt_depth, pred_depth, stage="train")
+            self.log_batch_images(
+                image, gt_depth, pred_depth, pred_logvar, stage="train"
+            )
 
         self.train_metrics.append(compute_metrics(pred_depth, gt_depth))
 
@@ -118,7 +144,7 @@ class LitBaseModel(lit.LightningModule):
         self.log("val/loss", loss, prog_bar=True, on_step=False, on_epoch=True)
 
         if batch_idx == 0:
-            self.log_batch_images(image, gt_depth, pred_depth, stage="val")
+            self.log_batch_images(image, gt_depth, pred_depth, pred_logvar, stage="val")
 
         self.val_metrics.append(compute_metrics(pred_depth, gt_depth))
 
