@@ -9,6 +9,7 @@ from torchvision.transforms.functional import to_pil_image
 from torchvision.utils import make_grid
 
 from data_module import ImageAndDepthDatasetItem
+from losses import NLLoss
 from utils import compute_metrics
 
 PREDICTIONS_DIR = Path("./data/predictions")
@@ -18,7 +19,9 @@ class LitBaseModel(lit.LightningModule):
     def __init__(self):
         super().__init__()
         self.save_hyperparameters()
-        self.loss_fn = nn.SmoothL1Loss()
+
+        # TODO: Make loss configurable with lightning
+        self.loss_fn = NLLoss()
         self.loss_fn.eval()
 
         self.train_metrics: List[Dict[str, float]] = []
@@ -81,9 +84,10 @@ class LitBaseModel(lit.LightningModule):
 
     def training_step(self, batch: ImageAndDepthDatasetItem, batch_idx: int):
         image, gt_depth = batch
-        pred_depth = self.forward(image)
+        # TODO: Add support for losses with both 1 and 2 outputs
+        pred_depth, pred_logvar = self.forward(image)
 
-        loss = self.loss_fn(pred_depth, gt_depth)
+        loss = self.loss_fn(pred_depth, pred_logvar, gt_depth)
         self.log("train/loss", loss, prog_bar=True, on_step=True, on_epoch=False)
 
         if (self.global_step + 1) % self.trainer.log_every_n_steps == 0:
@@ -106,9 +110,10 @@ class LitBaseModel(lit.LightningModule):
         skip_log: bool = False,
     ):
         image, gt_depth = batch
-        pred_depth = self.forward(image)
+        # TODO: Add support for losses with both 1 and 2 outputs
+        pred_depth, pred_logvar = self.forward(image)
 
-        loss = self.loss_fn(pred_depth, gt_depth)
+        loss = self.loss_fn(pred_depth, pred_logvar, gt_depth)
 
         self.log("val/loss", loss, prog_bar=True, on_step=False, on_epoch=True)
 
