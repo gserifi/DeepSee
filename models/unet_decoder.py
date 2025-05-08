@@ -53,7 +53,6 @@ class UNetDecoder(BaseDecoder):
         self, x: torch.Tensor, feats: tuple[torch.Tensor, ...]
     ) -> tuple[torch.Tensor]:
         feats = torch.cat(feats, dim=-1)
-        print(feats.shape)
         feats = feats.permute(0, 2, 1).reshape(
             (
                 feats.shape[0],
