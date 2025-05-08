@@ -1,13 +1,12 @@
-from typing import Sequence, Tuple
+from typing import Sequence
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 from models.base_decoder import BaseDecoder
 
 
-class ResidualConvBlock(nn.Module):
+class ResidualConvBlock(torch.nn.Module):
     """
     Residual convolutional block with two convolutional layers and batch normalization.
     Conserves input size and uses ReLU activation.
@@ -23,9 +22,9 @@ class ResidualConvBlock(nn.Module):
 
     def __init__(self, in_channels: int, out_channels: int):
         super(ResidualConvBlock, self).__init__()
-        self.conv_block1 = nn.Sequential(
-            nn.ReLU(),
-            nn.Conv2d(
+        self.conv_block1 = torch.nn.Sequential(
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(
                 in_channels,
                 out_channels,
                 kernel_size=3,
@@ -34,11 +33,11 @@ class ResidualConvBlock(nn.Module):
                 bias=True,
                 groups=1,
             ),
-            nn.BatchNorm2d(out_channels),
+            torch.nn.BatchNorm2d(out_channels),
         )
-        self.conv_block2 = nn.Sequential(
-            nn.ReLU(),
-            nn.Conv2d(
+        self.conv_block2 = torch.nn.Sequential(
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(
                 out_channels,
                 out_channels,
                 kernel_size=3,
@@ -47,7 +46,7 @@ class ResidualConvBlock(nn.Module):
                 bias=True,
                 groups=1,
             ),
-            nn.BatchNorm2d(out_channels),
+            torch.nn.BatchNorm2d(out_channels),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -57,7 +56,7 @@ class ResidualConvBlock(nn.Module):
         return residual + x2
 
 
-class FusionBlock(nn.Module):
+class FusionBlock(torch.nn.Module):
     """
     Fusion block to continuously fuse features from different stages of the encoder.
     As from:
@@ -72,7 +71,7 @@ class FusionBlock(nn.Module):
         super().__init__()
         self.rcu1 = ResidualConvBlock(in_channels, in_channels)
         self.rcu2 = ResidualConvBlock(in_channels, in_channels)
-        self.project = nn.Conv2d(
+        self.project = torch.nn.Conv2d(
             in_channels,
             in_channels,
             kernel_size=1,
@@ -100,7 +99,7 @@ class FusionBlock(nn.Module):
         return self.project(x)  # 1x1 convolution to reduce channels
 
 
-class ReassembleBlock(nn.Module):
+class ReassembleBlock(torch.nn.Module):
     """
     Reassemble block to transform image tokens into image-like feature representations.
     As from:
@@ -131,23 +130,23 @@ class ReassembleBlock(nn.Module):
         super().__init__()
         self.n_patches_h = n_patches_h
         self.n_patches_w = n_patches_w
-        self.proj = nn.Conv2d(
+        self.proj = torch.nn.Conv2d(
             in_channels, out_channels, kernel_size=1, stride=1, padding=0
         )
 
         # Use Depth-Anything-V2 resampling method instead of DPT
         if scale == 4.0:
-            self.resample = nn.ConvTranspose2d(
+            self.resample = torch.nn.ConvTranspose2d(
                 out_channels, out_channels, kernel_size=4, stride=4, padding=0
             )
         elif scale == 2.0:
-            self.resample = nn.ConvTranspose2d(
+            self.resample = torch.nn.ConvTranspose2d(
                 out_channels, out_channels, kernel_size=2, stride=2, padding=0
             )
         elif scale == 1.0:
-            self.resample = nn.Identity()
+            self.resample = torch.nn.Identity()
         elif scale == 0.5:
-            self.resample = nn.Conv2d(
+            self.resample = torch.nn.Conv2d(
                 out_channels, out_channels, kernel_size=3, stride=2, padding=1
             )
         else:
@@ -155,7 +154,7 @@ class ReassembleBlock(nn.Module):
 
         # Add the fusion projection layer from Depth-Anything-V2.
         # This is missing in the original DPT code.
-        self.fusion_proj = nn.Conv2d(
+        self.fusion_proj = torch.nn.Conv2d(
             out_channels,
             features,
             kernel_size=3,
@@ -181,7 +180,7 @@ class ReassembleBlock(nn.Module):
         return self.fusion_proj(x)  # Additional Depth-Anything-V2 projection layer
 
 
-class DepthHead(nn.Module):
+class DepthHead(torch.nn.Module):
     """
     Depth head to predict the depth map from the fused features.
     Adapted from https://github.com/DepthAnything/Depth-Anything-V2/blob/main/depth_anything_v2/util/dpt.py
@@ -200,14 +199,14 @@ class DepthHead(nn.Module):
         self.n_patch_h = patch_h
         self.n_patch_w = patch_w
         self.max_depth = max_depth
-        self.conv1 = nn.Conv2d(
+        self.conv1 = torch.nn.Conv2d(
             in_channels, in_channels // 2, kernel_size=3, stride=1, padding=1
         )
-        self.conv_block_2 = nn.Sequential(
-            nn.Conv2d(in_channels // 2, 32, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(32, 1, kernel_size=1, stride=1, padding=0),
-            nn.Sigmoid(),
+        self.conv_block_2 = torch.nn.Sequential(
+            torch.nn.Conv2d(in_channels // 2, 32, kernel_size=3, stride=1, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(32, 1, kernel_size=1, stride=1, padding=0),
+            torch.nn.Sigmoid(),
         )
 
     def forward(self, x: torch.Tensor, output_dim: Sequence[int]) -> torch.Tensor:
@@ -231,7 +230,7 @@ class DepthHead(nn.Module):
         return depth
 
 
-class LogVarHead(nn.Module):
+class LogVarHead(torch.nn.Module):
     """
     Log variance head to predict the log variance of the depth map.
     Currently same as depth head, but without sigmoid activations.
@@ -246,11 +245,11 @@ class LogVarHead(nn.Module):
         super().__init__()
         self.n_patches_h = patch_h
         self.n_patches_w = patch_w
-        self.conv1 = nn.Conv2d(
+        self.conv1 = torch.nn.Conv2d(
             in_channels, in_channels // 2, kernel_size=3, stride=1, padding=1
         )
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(in_channels // 2, 1, kernel_size=3, stride=1, padding=1),
+        self.conv2 = torch.nn.Sequential(
+            torch.nn.Conv2d(in_channels // 2, 1, kernel_size=3, stride=1, padding=1),
         )
 
     def forward(self, x: torch.Tensor, output_dim: Sequence[int]) -> torch.Tensor:
@@ -366,8 +365,8 @@ class PDPTDecoder(BaseDecoder):
         )
 
     def forward(
-        self, x: torch.Tensor, feats: Tuple[torch.Tensor, ...]
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        self, x: torch.Tensor, feats: tuple[torch.Tensor, ...]
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         :param x: Input image tensor (B, C, H, W)
         :param feats: Tuple of feature tensors from the encoder (B, num_patches, feature_dim).

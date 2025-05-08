@@ -13,6 +13,10 @@ model:
       class_path: PDPTDecoder
       init_args:
         feature_shape: [768, 16, 16] # 3'072 = 4 * 768 feature channels
+    loss_fns:
+      - - class_path: NLLLoss
+          init_args: { }
+        - 1.0
 data:
   data_root: data
   batch_size: 32

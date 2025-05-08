@@ -1,11 +1,9 @@
-from typing import Dict
-
 import torch
 
 
 def compute_metrics(
     pred_depth: torch.Tensor, gt_depth: torch.Tensor
-) -> Dict[str, float]:
+) -> dict[str, float]:
     B = pred_depth.size(0)
 
     abs_diff = torch.abs(pred_depth - gt_depth)

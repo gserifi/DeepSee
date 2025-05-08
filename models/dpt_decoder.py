@@ -1,4 +1,4 @@
-from typing import Sequence, Tuple
+from typing import Sequence
 
 import torch
 import torch.nn.functional as F
@@ -37,7 +37,9 @@ class DPTDecoder(BaseDecoder):
         #         if m.bias is not None:
         #             torch.nn.init.zeros_(m.bias)
 
-    def forward(self, x: torch.Tensor, feats: Tuple[torch.Tensor, ...]) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, feats: tuple[torch.Tensor, ...]
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         depth = self.depth_head(feats, self.patch_h, self.patch_w)
 
         print(
@@ -60,4 +62,4 @@ class DPTDecoder(BaseDecoder):
 
         # print(f"Stats: {depth.min()}, {depth.max()}, {depth.mean()}, {depth.std()}")
 
-        return depth
+        return depth, torch.zeros_like(depth)

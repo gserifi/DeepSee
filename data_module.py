@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Union
 
 import lightning as lit
 import numpy as np
@@ -7,7 +7,7 @@ import torch
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 
-ImageAndDepthDatasetItem = Tuple[torch.Tensor, Union[torch.Tensor, str]]
+ImageAndDepthDatasetItem = tuple[torch.Tensor, Union[torch.Tensor, str]]
 
 
 class ImageAndDepthDataset(Dataset[ImageAndDepthDatasetItem]):
@@ -17,7 +17,7 @@ class ImageAndDepthDataset(Dataset[ImageAndDepthDatasetItem]):
     available, e.g. for the prediction set).
     """
 
-    def __init__(self, image_dir: Path, image_list: List[Tuple[str, str]]):
+    def __init__(self, image_dir: Path, image_list: list[tuple[str, str]]):
         self.image_dir = image_dir
         self.image_list = image_list
 
@@ -57,10 +57,10 @@ class LitDataModule(lit.LightningDataModule):
     Data module for loading image and depth datasets. See `ImageAndDepthDataset` for details.
     """
 
-    train_list: List[Tuple[str, str]]
-    val_list: List[Tuple[str, str]]
-    test_list: List[Tuple[str, str]]
-    predict_list: List[Tuple[str, str]]
+    train_list: list[tuple[str, str]]
+    val_list: list[tuple[str, str]]
+    test_list: list[tuple[str, str]]
+    predict_list: list[tuple[str, str]]
 
     train_dataset: ImageAndDepthDataset
     val_dataset: ImageAndDepthDataset

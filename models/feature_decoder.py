@@ -1,7 +1,7 @@
 import torch
 from torch import optim
 
-from base_model import LitBaseModel
+from base_model import BaseLoss, LitBaseModel
 from models.base_decoder import BaseDecoder
 from models.base_feature_extractor import BaseFeatureExtractor
 
@@ -15,6 +15,7 @@ class FeatureDecoder(LitBaseModel):
         self,
         feature_extractor: BaseFeatureExtractor,
         decoder: BaseDecoder,
+        loss_fns: list[tuple[BaseLoss, float]] = None,
         freeze_extractor: bool = True,
     ):
         """
@@ -23,7 +24,7 @@ class FeatureDecoder(LitBaseModel):
         :param freeze_extractor: If True, freeze the feature extractor parameters
         """
 
-        super().__init__()
+        super().__init__(loss_fns=loss_fns)
         self.feature_extractor = feature_extractor
         self.decoder = decoder
         self.freeze_extractor = freeze_extractor

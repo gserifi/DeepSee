@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import lightning as lit
 import torch
 
@@ -13,7 +11,7 @@ class BaseFeatureExtractor(lit.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, ...]:
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, ...]:
         """
         :param x: Input images of shape (B, 3, H, W)
 

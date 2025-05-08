@@ -1,4 +1,4 @@
-from typing import Sequence, Tuple
+from typing import Sequence
 
 import torch
 import torch.nn.functional as F
@@ -49,7 +49,9 @@ class UNetDecoder(BaseDecoder):
             padding=0,
         )
 
-    def forward(self, x: torch.Tensor, feats: Tuple[torch.Tensor, ...]) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, feats: tuple[torch.Tensor, ...]
+    ) -> tuple[torch.Tensor]:
         feats = torch.cat(feats, dim=-1)
         print(feats.shape)
         feats = feats.permute(0, 2, 1).reshape(
@@ -88,4 +90,4 @@ class UNetDecoder(BaseDecoder):
         # Map the depth to a range of 0 to 10 meters, as stated in the project description
         depth = torch.sigmoid(depth) * 10
 
-        return depth
+        return depth, torch.zeros_like(depth)

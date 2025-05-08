@@ -1,33 +1,31 @@
 from pathlib import Path
-from typing import Dict, List
 
 import lightning as lit
 import numpy as np
 import torch
 from matplotlib import cm
-from torch import nn, optim
 from torchvision.transforms.functional import to_pil_image
 from torchvision.utils import make_grid
 
 from data_module import ImageAndDepthDatasetItem
-from losses import NLLoss
+from losses import BaseLoss, L2Loss, LossQueryRecord
 from utils import compute_metrics
 
 PREDICTIONS_DIR = Path("./data/predictions")
 
 
 class LitBaseModel(lit.LightningModule):
-    def __init__(self):
+    def __init__(self, loss_fns: list[tuple[BaseLoss, float]] = None):
         super().__init__()
         self.save_hyperparameters()
 
-        # TODO: Make loss configurable with lightning
-        self.loss_fn = NLLoss()
-        self.loss_fn.eval()
+        self.loss_fns = loss_fns if loss_fns is not None else [(L2Loss(), 1.0)]
+        for loss_fn, _ in self.loss_fns:
+            loss_fn.eval()
 
-        self.train_metrics: List[Dict[str, float]] = []
-        self.val_metrics: List[Dict[str, float]] = []
-        self.test_metrics: List[Dict[str, float]] = []
+        self.train_metrics: list[dict[str, float]] = []
+        self.val_metrics: list[dict[str, float]] = []
+        self.test_metrics: list[dict[str, float]] = []
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError(
@@ -80,7 +78,7 @@ class LitBaseModel(lit.LightningModule):
         )
 
     @staticmethod
-    def agg_metrics(metrics: List[Dict[str, float]], stage: str) -> Dict[str, float]:
+    def agg_metrics(metrics: list[dict[str, float]], stage: str) -> dict[str, float]:
         total_samples = sum(m["num_samples"] for m in metrics)
         total_pixels = sum(m["num_pixels"] for m in metrics)
 
@@ -106,13 +104,46 @@ class LitBaseModel(lit.LightningModule):
 
         return {f"{stage}/{k}": v for k, v in agg_dict.items()}
 
+    def compute_loss(
+        self,
+        pred_depth: torch.Tensor,
+        pred_logvar: torch.Tensor,
+        gt_depth: torch.Tensor,
+    ) -> tuple[torch.Tensor, dict[str, float]]:
+        total_loss = 0
+        log_dict = {}
+
+        query_record = LossQueryRecord(
+            pred_depth=pred_depth, pred_logvar=pred_logvar, gt_depth=gt_depth
+        )
+
+        for loss_fn, weight in self.loss_fns:
+            _loss = loss_fn(query_record)
+            total_loss += weight * _loss
+            log_dict[str(loss_fn)] = _loss.item()
+
+        return total_loss, log_dict
+
+    def log_losses(
+        self, log_dict: dict[str, float], on_step: bool, on_epoch: bool, stage: str
+    ):
+        for key, value in log_dict.items():
+            self.log(
+                f"{stage}/{key}",
+                value,
+                prog_bar=False,
+                on_step=on_step,
+                on_epoch=on_epoch,
+            )
+
     def training_step(self, batch: ImageAndDepthDatasetItem, batch_idx: int):
         image, gt_depth = batch
-        # TODO: Add support for losses with both 1 and 2 outputs
+
         pred_depth, pred_logvar = self.forward(image)
 
-        loss = self.loss_fn(pred_depth, pred_logvar, gt_depth)
+        loss, log_dict = self.compute_loss(pred_depth, pred_logvar, gt_depth)
         self.log("train/loss", loss, prog_bar=True, on_step=True, on_epoch=False)
+        self.log_losses(log_dict, on_step=True, on_epoch=False, stage="train")
 
         if (self.global_step + 1) % self.trainer.log_every_n_steps == 0:
             self.log_batch_images(
@@ -136,12 +167,13 @@ class LitBaseModel(lit.LightningModule):
         skip_log: bool = False,
     ):
         image, gt_depth = batch
-        # TODO: Add support for losses with both 1 and 2 outputs
+
         pred_depth, pred_logvar = self.forward(image)
 
-        loss = self.loss_fn(pred_depth, pred_logvar, gt_depth)
+        loss, log_dict = self.compute_loss(pred_depth, pred_logvar, gt_depth)
 
         self.log("val/loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log_losses(log_dict, on_step=False, on_epoch=True, stage="val")
 
         if batch_idx == 0:
             self.log_batch_images(image, gt_depth, pred_depth, pred_logvar, stage="val")
@@ -182,6 +214,6 @@ class LitBaseModel(lit.LightningModule):
             depth_im.save(PREDICTIONS_DIR / name.replace(".npy", ".png"))
             np.save(PREDICTIONS_DIR / name, pred.numpy())
 
-    def configure_optimizers(self) -> optim.Optimizer:
-        optimizer = optim.Adam(self.parameters())
+    def configure_optimizers(self) -> torch.optim.Optimizer:
+        optimizer = torch.optim.Adam(self.parameters())
         return optimizer

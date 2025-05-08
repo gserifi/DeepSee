@@ -1,11 +1,5 @@
-from typing import List, Tuple
-
 import torch
-from transformers import (
-    AutoImageProcessor,
-    Dinov2WithRegistersBackbone,
-    Dinov2WithRegistersModel,
-)
+from transformers import AutoImageProcessor, Dinov2WithRegistersModel
 
 from models.base_feature_extractor import BaseFeatureExtractor
 
@@ -18,7 +12,7 @@ class DinoFeatureExtractor(BaseFeatureExtractor):
 
     def __init__(
         self,
-        out_features: List[str] = None,
+        out_features: list[str] = None,
         dino_model: str = "facebook/dinov2-with-registers-base",
     ):
         """
@@ -48,18 +42,16 @@ class DinoFeatureExtractor(BaseFeatureExtractor):
 
         self.feat_channels = self.num_features * self.hidden_size
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, ...]:
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, ...]:
         # Transform images to the right format
         inputs = self.image_processor(images=x, return_tensors="pt", do_rescale=False)
         inputs = {k: v.to(x.device) for k, v in inputs.items()}
 
         # Extract features from the DINOv2 model
         outputs = self.dino(**inputs, output_hidden_states=True)
-        hidden_states: Tuple[torch.Tensor, ...] = outputs.hidden_states
+        hidden_states: tuple[torch.Tensor, ...] = outputs.hidden_states
         hidden_states = tuple(
             hs[:, 5:, :] for i, hs in enumerate(hidden_states) if i in [2, 5, 8, 11]
         )  # Skip CLS + Register tokens
 
-        # print("Hidden states:", len(hidden_states))
-        # print("Hidden state shape:", ", ".join([str(hs.shape) for hs in hidden_states]))
         return hidden_states
