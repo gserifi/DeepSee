@@ -23,7 +23,10 @@ class DinoFeatureExtractor(BaseFeatureExtractor):
 
         # Load the image processor that transforms the input images into the format expected by the DINOv2 model
         self.image_processor = AutoImageProcessor.from_pretrained(
-            dino_model, use_fast=True
+            dino_model,
+            use_fast=True,
+            crop_size={"height": 420, "width": 560},
+            size={"shortest_edge": 420},
         )
 
         # Layer names to extract features from
@@ -51,7 +54,7 @@ class DinoFeatureExtractor(BaseFeatureExtractor):
         outputs = self.dino(**inputs, output_hidden_states=True)
         hidden_states: tuple[torch.Tensor, ...] = outputs.hidden_states
         hidden_states = tuple(
-            hs[:, 5:, :] for i, hs in enumerate(hidden_states) if i in [2, 5, 8, 11]
+            hs[:, 5:, :128] for i, hs in enumerate(hidden_states) if i in [2, 5, 8, 11]
         )  # Skip CLS + Register tokens
 
         return hidden_states

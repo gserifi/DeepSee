@@ -23,7 +23,7 @@ class ResidualConvBlock(torch.nn.Module):
     def __init__(self, in_channels: int, out_channels: int):
         super(ResidualConvBlock, self).__init__()
         self.conv_block1 = torch.nn.Sequential(
-            torch.nn.ReLU(),
+            torch.nn.ReLU(inplace=True),
             torch.nn.Conv2d(
                 in_channels,
                 out_channels,
@@ -36,7 +36,7 @@ class ResidualConvBlock(torch.nn.Module):
             torch.nn.BatchNorm2d(out_channels),
         )
         self.conv_block2 = torch.nn.Sequential(
-            torch.nn.ReLU(),
+            torch.nn.ReLU(inplace=True),
             torch.nn.Conv2d(
                 out_channels,
                 out_channels,
@@ -204,7 +204,7 @@ class DepthHead(torch.nn.Module):
         )
         self.conv_block_2 = torch.nn.Sequential(
             torch.nn.Conv2d(in_channels // 2, 32, kernel_size=3, stride=1, padding=1),
-            torch.nn.ReLU(),
+            torch.nn.ReLU(inplace=True),
             torch.nn.Conv2d(32, 1, kernel_size=1, stride=1, padding=0),
             torch.nn.Sigmoid(),
         )

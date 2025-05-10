@@ -190,7 +190,7 @@ class LitBaseModel(lit.LightningModule):
 
     def test_step(self, batch: ImageAndDepthDatasetItem, batch_idx: int):
         image, gt_depth = batch
-        pred_depth = self.forward(image)
+        pred_depth, _ = self.forward(image)
 
         self.test_metrics.append(compute_metrics(pred_depth, gt_depth))
 
@@ -204,7 +204,7 @@ class LitBaseModel(lit.LightningModule):
 
     def predict_step(self, batch: ImageAndDepthDatasetItem, batch_idx: int):
         image, filename = batch
-        pred_depth = self.forward(image)
+        pred_depth, _ = self.forward(image)
 
         pred_depth = pred_depth.squeeze(1).cpu()
 

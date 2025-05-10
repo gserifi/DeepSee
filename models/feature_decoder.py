@@ -29,6 +29,9 @@ class FeatureDecoder(LitBaseModel):
         self.decoder = decoder
         self.freeze_extractor = freeze_extractor
 
+        if self.freeze_extractor:
+            self.feature_extractor.freeze()
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass through the model. The input is a batch of images and the output is a depth map of the same shape.
