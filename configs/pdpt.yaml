@@ -10,6 +10,7 @@ model:
       init_args:
         out_features: ["stage2", "stage5", "stage8", "stage11"]
         dino_model: "facebook/dinov2-with-registers-small"
+        use_feature_projection: true # set to false for slicing instead of projecting
     decoder:
       class_path: PDPTDecoder
       init_args:
