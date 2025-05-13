@@ -10,12 +10,13 @@ model:
       init_args:
         out_features: ["stage2", "stage5", "stage8", "stage11"]
         dino_model: "facebook/dinov2-with-registers-small"
-        use_feature_projection: true # set to false for slicing instead of projecting
     decoder:
       class_path: PDPTDecoder
       init_args:
-        feature_shape: [128, 30, 40] # 3'072 = 4 * 768 feature channels
-        feature_dim: 128
+        feature_shape: [384, 30, 40] # 3'072 = 4 * 768 feature channels
+        feature_dim: 384
+        feature_projection_dim: 128
+        use_feature_projection: false # set to false for slicing instead of projecting
     loss_fns:
       - - class_path: NLLLoss
           init_args: { }

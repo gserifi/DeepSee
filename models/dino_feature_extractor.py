@@ -14,17 +14,12 @@ class DinoFeatureExtractor(BaseFeatureExtractor):
         self,
         out_features: list[str] = None,
         dino_model: str = "facebook/dinov2-with-registers-base",
-        feature_projection_dim: int = 128,
-        use_feature_projection: bool = True,
     ):
         """
         :param dino_model: For other options, see https://huggingface.co/models?search=facebook/dino
         """
 
         super().__init__()
-
-        self.feature_projection_dim = feature_projection_dim
-        self.use_feature_projection = use_feature_projection
 
         # Load the image processor that transforms the input images into the format expected by the DINOv2 model
         self.image_processor = AutoImageProcessor.from_pretrained(
@@ -50,11 +45,6 @@ class DinoFeatureExtractor(BaseFeatureExtractor):
 
         self.feat_channels = self.num_features * self.hidden_size
 
-        if self.use_feature_projection:
-            self.feature_projection = torch.nn.Linear(
-                self.hidden_size, self.feature_projection_dim, bias=False
-            )
-
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, ...]:
         # Transform images to the right format
         inputs = self.image_processor(images=x, return_tensors="pt", do_rescale=False)
@@ -64,13 +54,7 @@ class DinoFeatureExtractor(BaseFeatureExtractor):
         outputs = self.dino(**inputs, output_hidden_states=True)
         hidden_states: tuple[torch.Tensor, ...] = outputs.hidden_states
         hidden_states = tuple(
-            (
-                hs[:, 5:, : self.feature_projection_dim]
-                if not self.use_feature_projection
-                else self.feature_projection(hs[:, 5:, :])
-            )
-            for i, hs in enumerate(hidden_states)
-            if i in [2, 5, 8, 11]
+            hs[:, 5:, :] for i, hs in enumerate(hidden_states) if i in [2, 5, 8, 11]
         )  # Skip CLS + Register tokens
 
         return hidden_states

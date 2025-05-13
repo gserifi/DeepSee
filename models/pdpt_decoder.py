@@ -286,6 +286,8 @@ class PDPTDecoder(BaseDecoder):
         feature_shape: Sequence[int],
         feature_dim: int = 256,
         out_channels: Sequence[int] = (256, 512, 1024, 1024),
+        feature_projection_dim: int = 128,
+        use_feature_projection: bool = True,
         debug: bool = False,
     ):
         """
@@ -293,15 +295,21 @@ class PDPTDecoder(BaseDecoder):
         :param feature_dim: Dimension of feature space used in decoder.
                             Defaults to 256 (Depthy-Anything-V2).
         :param out_channels: Number of channels in each reassemble block.
+        :param feature_projection_dim: Dimension of the feature projection layer / feature slicing.
+        :param use_feature_projection: If true, use a linear layer to project the features, otherwise do slicing.
         :param debug: If true, print debug information.
         """
         super().__init__(feature_shape)
+
+        self.feature_projection_dim = feature_projection_dim
+        self.use_feature_projection = use_feature_projection
+
         self.debug = debug
 
         if self.debug:
             print(f"Feature shape: {feature_shape}")
 
-        self.feat_channels: int = self.feature_shape[0]
+        self.feat_channels: int = self.feature_projection_dim
         self.n_patches_h: int = self.feature_shape[1]
         self.n_patches_w: int = self.feature_shape[2]
         self.feature_dim = feature_dim
@@ -364,6 +372,11 @@ class PDPTDecoder(BaseDecoder):
             patch_w=self.n_patches_w,
         )
 
+        if self.use_feature_projection:
+            self.feature_projection = torch.nn.Linear(
+                self.feature_dim, self.feature_projection_dim
+            )
+
     def forward(
         self, x: torch.Tensor, feats: tuple[torch.Tensor, ...]
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -372,6 +385,15 @@ class PDPTDecoder(BaseDecoder):
         :param feats: Tuple of feature tensors from the encoder (B, num_patches, feature_dim).
                       Each tensor corresponds to a different stage of the encoder.
         """
+
+        feats = tuple(
+            (
+                f[:, :, : self.feature_projection_dim]
+                if not self.use_feature_projection
+                else self.feature_projection(f)
+            )
+            for f in feats
+        )
 
         # Reassemble the features
         # (B, num_patches, dpt_feature_dim) -> (B, DAV2_feautre_dim, patch_h * scale, patch_w * scale)
