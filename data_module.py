@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
 
 ImageAndDepthDatasetItem = tuple[torch.Tensor, Union[torch.Tensor, str]]
 
@@ -17,9 +18,12 @@ class ImageAndDepthDataset(Dataset[ImageAndDepthDatasetItem]):
     available, e.g. for the prediction set).
     """
 
-    def __init__(self, image_dir: Path, image_list: list[tuple[str, str]]):
+    def __init__(
+        self, image_dir: Path, image_list: list[tuple[str, str]], transform=None
+    ):
         self.image_dir = image_dir
         self.image_list = image_list
+        self.transform = transform
 
     def __len__(self) -> int:
         return len(self.image_list)
@@ -48,6 +52,10 @@ class ImageAndDepthDataset(Dataset[ImageAndDepthDatasetItem]):
 
         if depth is None:
             depth = depth_path
+
+        # Apply transformation on the tensor
+        if self.transform is not None:
+            image = self.transform(image)
 
         return image, depth
 
@@ -114,11 +122,20 @@ class LitDataModule(lit.LightningDataModule):
         )
 
     def setup(self, stage=None):
+        # normalizations happens in the image preprocessor
+        train_transforms = transforms.Compose(
+            [
+                transforms.ColorJitter(
+                    brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
+                ),
+            ]
+        )
+
         self.train_dataset = ImageAndDepthDataset(
-            self.data_root / "train" / "train", self.train_list
+            self.data_root / "train" / "train", self.train_list, train_transforms
         )
         self.val_dataset = ImageAndDepthDataset(
-            self.data_root / "train" / "train", self.val_list
+            self.data_root / "train" / "train", self.val_list, train_transforms
         )
         self.test_dataset = ImageAndDepthDataset(
             self.data_root / "train" / "train", self.test_list
