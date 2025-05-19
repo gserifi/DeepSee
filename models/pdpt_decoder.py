@@ -165,16 +165,6 @@ class ReassembleBlock(torch.nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # We don't have a CLS token, so we just reshape input tensor
-        B, N, C = x.shape
-        assert (
-            N == self.n_patches_h * self.n_patches_w
-        ), f"Expected {self.n_patches_h * self.n_patches_w} tokens, got {N}"
-        x = (
-            x.permute(0, 2, 1)
-            .reshape(B, C, self.n_patches_h, self.n_patches_w)
-            .contiguous()
-        )
         x = self.proj(x)
         x = self.resample(x)
         return self.fusion_proj(x)  # Additional Depth-Anything-V2 projection layer
@@ -373,8 +363,12 @@ class PDPTDecoder(BaseDecoder):
         )
 
         if self.use_feature_projection:
-            self.feature_projection = torch.nn.Linear(
-                self.feature_dim, self.feature_projection_dim
+            self.feature_projection = torch.nn.Conv2d(
+                self.feature_shape[0],
+                self.feature_projection_dim,
+                kernel_size=1,
+                stride=1,
+                padding=0,
             )
 
     def forward(
@@ -385,18 +379,27 @@ class PDPTDecoder(BaseDecoder):
         :param feats: Tuple of feature tensors from the encoder (B, num_patches, feature_dim).
                       Each tensor corresponds to a different stage of the encoder.
         """
+        B, N, C = feats[0].shape
+        assert (
+            N == self.n_patches_h * self.n_patches_w
+        ), f"Expected {self.n_patches_h * self.n_patches_w} tokens, got {N}"
 
+        # Reshape the features to (B, feature_dim, n_patches_h, n_patches_w)
         feats = tuple(
             (
-                f[:, :, : self.feature_projection_dim]
-                if not self.use_feature_projection
-                else self.feature_projection(f)
+                f.permute(0, 2, 1)
+                .reshape(B, C, self.n_patches_h, self.n_patches_w)
+                .contiguous()
             )
             for f in feats
         )
 
+        # Apply feature projection to reduce the number of channels from DINO
+        if self.feature_projection:
+            feats = tuple(map(self.feature_projection, feats))
+
         # Reassemble the features
-        # (B, num_patches, dpt_feature_dim) -> (B, DAV2_feautre_dim, patch_h * scale, patch_w * scale)
+        # (B, feature_projection, patch_h, patch_w) -> (B, DAV2_feautre_dim, patch_h * scale, patch_w * scale)
         x1 = self.reassemble_block1(feats[0])  # Scale 4.0
         x2 = self.reassemble_block2(feats[1])  # Scale 2.0
         x3 = self.reassemble_block3(feats[2])  # Scale 1.0

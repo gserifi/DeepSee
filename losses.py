@@ -136,3 +136,24 @@ class NLLLoss(BaseLoss):
             + 0.5 * pred_logvar
         )
         return loss.mean()
+
+
+class NLLLogLoss(BaseLoss):
+    """
+    Negative Log Likelihood Loss assuming prior log Gaussian distribution on depth.
+    """
+
+    def __init__(self):
+        # @TODO: Maybe add regularization term and variance penalty term
+        super().__init__()
+
+    def forward(self, query_record: LossQueryRecord):
+        eps = query_record.eps
+        pred_depth = torch.clamp(query_record.pred_depth, min=eps)
+        gt_depth = torch.clamp(query_record.gt_depth, min=eps)
+        pred_logvar = query_record.pred_logvar
+
+        diff_log = torch.log(gt_depth) - torch.log(pred_depth)
+
+        loss = 0.5 * torch.exp(-pred_logvar) * diff_log**2 + 0.5 * pred_logvar
+        return loss.mean()
