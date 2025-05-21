@@ -19,7 +19,7 @@ model:
         feature_projection_dim: 128
         use_feature_projection: true # set to false for slicing instead of projecting
     loss_fns:
-      - - class_path: NLLLogLoss
+      - - class_path: NLLLoss
           init_args: { }
         - 1.0
 data:

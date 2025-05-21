@@ -261,6 +261,24 @@ class LogVarHead(torch.nn.Module):
         return logvar
 
 
+class CrossAttentionBlock(torch.nn.Module):
+    def __init__(self, dim, heads=4):
+        super().__init__()
+        self.mha = torch.nn.MultiheadAttention(
+            embed_dim=dim, num_heads=heads, batch_first=True
+        )
+        self.norm = torch.nn.LayerNorm(dim)
+
+    def forward(self, img_tokens: torch.Tensor, image_feats: torch.Tensor):
+        """
+        tokens: (B, N, C)
+        image_feats: (B, C, H, W) → flatten to (B, HW, C)
+        """
+        img_flat = image_feats.flatten(2).permute(0, 2, 1)  # (B, HW, C)
+        out, _ = self.mha(query=img_tokens, key=img_flat, value=img_flat)
+        return self.norm(out + img_tokens)
+
+
 class PDPTDecoder(BaseDecoder):
     """
     Probabilistic DPT decoder, based on:
@@ -371,6 +389,9 @@ class PDPTDecoder(BaseDecoder):
                 padding=0,
             )
 
+        self.cross_attention = CrossAttentionBlock(dim=self.feature_projection_dim)
+        self.rgb_encoder = torch.nn.Conv2d(3, self.feature_projection_dim, 3, padding=1)
+
     def forward(
         self, x: torch.Tensor, feats: tuple[torch.Tensor, ...]
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -397,6 +418,19 @@ class PDPTDecoder(BaseDecoder):
         # Apply feature projection to reduce the number of channels from DINO
         if self.feature_projection:
             feats = tuple(map(self.feature_projection, feats))
+
+        # Apply cross attention to the first image token
+        rgb_feats = self.rgb_encoder(x)
+        img_pool = F.adaptive_avg_pool2d(
+            rgb_feats, (self.n_patches_h, self.n_patches_w)
+        )
+        first_feat_token = feats[0].flatten(2).permute(0, 2, 1)  # (B, HW, C)
+        first_feat_cross_attention = self.cross_attention(first_feat_token, img_pool)
+        feats = (
+            first_feat_cross_attention.permute(0, 2, 1).reshape(
+                B, self.feature_projection_dim, self.n_patches_h, self.n_patches_w
+            ),
+        ) + feats[1:]
 
         # Reassemble the features
         # (B, feature_projection, patch_h, patch_w) -> (B, DAV2_feautre_dim, patch_h * scale, patch_w * scale)
