@@ -1,3 +1,4 @@
+import warnings
 from dataclasses import dataclass
 
 import torch
@@ -79,7 +80,11 @@ class SiLogLoss(BaseLoss):
         self.lambd = lambd
         self.zero_punish = zero_punish
 
-        raise Warning("SiLogLoss has not been rigorously tested. Use with caution!")
+        # raise Warning("SiLogLoss has not been rigorously tested. Use with caution!")
+        warnings.warn(
+            "SiLogLoss has not been rigorously tested. Use with caution!",
+            UserWarning,
+        )
 
     def forward(
         self,
