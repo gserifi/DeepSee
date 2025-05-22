@@ -15,7 +15,7 @@ class PTransformerDecoder(BaseDecoder):
         decoder_dim: int = 2,
         nhead: int = 4,
         num_layers: int = 3,
-        tgt_mode: Literal["learned", "image"] = "learned",
+        tgt_mode: Literal["image", "learned", "fixed"] = "learned",
     ):
         super().__init__(feature_shape)
 
@@ -54,6 +54,9 @@ class PTransformerDecoder(BaseDecoder):
             self.image_proj = torch.nn.Conv1d(
                 3 * self.ph * self.pw, d_model, kernel_size=1
             )
+        elif self.tgt_mode == "fixed":
+            tgt_tokens = torch.randn(self.PH * self.PW, d_model)
+            self.register_buffer("tgt_tokens", tgt_tokens)
         elif self.tgt_mode == "learned":
             self.tgt_tokens = torch.nn.Parameter(
                 torch.randn(self.PH * self.PW, d_model)
@@ -87,7 +90,7 @@ class PTransformerDecoder(BaseDecoder):
                 c=x.size(1),
             )
             tgt = self.image_proj(tgt.permute(0, 2, 1)).permute(0, 2, 1)
-        elif self.tgt_mode == "learned":
+        elif self.tgt_mode in ["learned", "fixed"]:
             tgt = self.tgt_tokens.unsqueeze(0).expand(B, -1, -1)
 
         out = self.decoder(tgt, feats)
