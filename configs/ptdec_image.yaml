@@ -17,7 +17,7 @@ model:
         decoder_dim: 2
         nhead: 4
         num_layers: 3
-        tgt_mode: learned
+        tgt_mode: image
     loss_fns:
       - - class_path: NLLLoss
           init_args: { }
