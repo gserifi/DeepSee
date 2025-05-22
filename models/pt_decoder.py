@@ -92,8 +92,6 @@ class PTransformerDecoder(BaseDecoder):
 
         out = self.decoder(tgt, feats)
 
-        print(tgt.shape, feats.shape, out.shape)
-
         out = einops.rearrange(
             out,
             "b (h w) (c ph pw) -> b c (h ph) (w pw)",
