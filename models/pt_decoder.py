@@ -33,6 +33,7 @@ class PTransformerDecoder(BaseDecoder):
         decoder_layer = torch.nn.TransformerDecoderLayer(
             d_model=d_model,
             nhead=nhead,
+            batch_first=True,
         )
 
         self.decoder = torch.nn.TransformerDecoder(
@@ -90,6 +91,8 @@ class PTransformerDecoder(BaseDecoder):
             tgt = self.tgt_tokens.unsqueeze(0).expand(B, -1, -1)
 
         out = self.decoder(tgt, feats)
+
+        print(tgt.shape, feats.shape, out.shape)
 
         out = einops.rearrange(
             out,
