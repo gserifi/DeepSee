@@ -1,25 +1,29 @@
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Union
 
 import lightning as lit
 import numpy as np
 import torch
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
 
-ImageAndDepthDatasetItemType = Tuple[torch.Tensor, Union[torch.Tensor, str]]
+ImageAndDepthDatasetItem = tuple[torch.Tensor, Union[torch.Tensor, str]]
 
 
-class ImageAndDepthDataset(Dataset[ImageAndDepthDatasetItemType]):
+class ImageAndDepthDataset(Dataset[ImageAndDepthDatasetItem]):
     """
     Dataset for loading images and depth maps. __getitem__ returns a tuple of (image, depth), where image is always a
     tensor and depth may be either a tensor or a string denoting the path to the depth file (if ground truth is not
     available, e.g. for the prediction set).
     """
 
-    def __init__(self, image_dir: Path, image_list: List[Tuple[str, str]]):
+    def __init__(
+        self, image_dir: Path, image_list: list[tuple[str, str]], transform=None
+    ):
         self.image_dir = image_dir
         self.image_list = image_list
+        self.transform = transform
 
     def __len__(self) -> int:
         return len(self.image_list)
@@ -41,13 +45,17 @@ class ImageAndDepthDataset(Dataset[ImageAndDepthDatasetItemType]):
 
         return dp
 
-    def __getitem__(self, idx) -> ImageAndDepthDatasetItemType:
+    def __getitem__(self, idx) -> ImageAndDepthDatasetItem:
         image_path, depth_path = self.image_list[idx]
         image = ImageAndDepthDataset.load_image(self.image_dir / image_path)
         depth = ImageAndDepthDataset.load_depth(self.image_dir / depth_path)
 
         if depth is None:
             depth = depth_path
+
+        # Apply transformation on the tensor
+        if self.transform is not None:
+            image = self.transform(image)
 
         return image, depth
 
@@ -57,10 +65,10 @@ class LitDataModule(lit.LightningDataModule):
     Data module for loading image and depth datasets. See `ImageAndDepthDataset` for details.
     """
 
-    train_list: List[Tuple[str, str]]
-    val_list: List[Tuple[str, str]]
-    test_list: List[Tuple[str, str]]
-    predict_list: List[Tuple[str, str]]
+    train_list: list[tuple[str, str]]
+    val_list: list[tuple[str, str]]
+    test_list: list[tuple[str, str]]
+    predict_list: list[tuple[str, str]]
 
     train_dataset: ImageAndDepthDataset
     val_dataset: ImageAndDepthDataset
@@ -114,11 +122,20 @@ class LitDataModule(lit.LightningDataModule):
         )
 
     def setup(self, stage=None):
+        # normalizations happens in the image preprocessor
+        train_transforms = transforms.Compose(
+            [
+                transforms.ColorJitter(
+                    brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
+                ),
+            ]
+        )
+
         self.train_dataset = ImageAndDepthDataset(
-            self.data_root / "train" / "train", self.train_list
+            self.data_root / "train" / "train", self.train_list, train_transforms
         )
         self.val_dataset = ImageAndDepthDataset(
-            self.data_root / "train" / "train", self.val_list
+            self.data_root / "train" / "train", self.val_list, train_transforms
         )
         self.test_dataset = ImageAndDepthDataset(
             self.data_root / "train" / "train", self.test_list
@@ -129,7 +146,7 @@ class LitDataModule(lit.LightningDataModule):
 
     def dataloader(
         self, dataset: ImageAndDepthDataset, shuffle: bool = False
-    ) -> DataLoader[ImageAndDepthDatasetItemType]:
+    ) -> DataLoader[ImageAndDepthDatasetItem]:
         return DataLoader(
             dataset,
             batch_size=self.batch_size,
@@ -139,14 +156,14 @@ class LitDataModule(lit.LightningDataModule):
             pin_memory=self.pin_memory,
         )
 
-    def train_dataloader(self) -> DataLoader[ImageAndDepthDatasetItemType]:
+    def train_dataloader(self) -> DataLoader[ImageAndDepthDatasetItem]:
         return self.dataloader(self.train_dataset, shuffle=True)
 
-    def val_dataloader(self) -> DataLoader[ImageAndDepthDatasetItemType]:
+    def val_dataloader(self) -> DataLoader[ImageAndDepthDatasetItem]:
         return self.dataloader(self.val_dataset, shuffle=False)
 
-    def test_dataloader(self) -> DataLoader[ImageAndDepthDatasetItemType]:
+    def test_dataloader(self) -> DataLoader[ImageAndDepthDatasetItem]:
         return self.dataloader(self.test_dataset, shuffle=False)
 
-    def predict_dataloader(self) -> DataLoader[ImageAndDepthDatasetItemType]:
+    def predict_dataloader(self) -> DataLoader[ImageAndDepthDatasetItem]:
         return self.dataloader(self.predict_dataset, shuffle=False)

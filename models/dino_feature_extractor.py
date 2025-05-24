@@ -1,7 +1,5 @@
-from typing import List
-
 import torch
-from transformers import AutoImageProcessor, Dinov2WithRegistersBackbone
+from transformers import AutoImageProcessor, Dinov2WithRegistersModel
 
 from models.base_feature_extractor import BaseFeatureExtractor
 
@@ -14,7 +12,7 @@ class DinoFeatureExtractor(BaseFeatureExtractor):
 
     def __init__(
         self,
-        out_features: List[str] = None,
+        out_features: list[str] = None,
         dino_model: str = "facebook/dinov2-with-registers-base",
     ):
         """
@@ -25,7 +23,10 @@ class DinoFeatureExtractor(BaseFeatureExtractor):
 
         # Load the image processor that transforms the input images into the format expected by the DINOv2 model
         self.image_processor = AutoImageProcessor.from_pretrained(
-            dino_model, use_fast=True
+            dino_model,
+            use_fast=True,
+            crop_size={"height": 420, "width": 560},
+            size={"shortest_edge": 420},
         )
 
         # Layer names to extract features from
@@ -34,8 +35,8 @@ class DinoFeatureExtractor(BaseFeatureExtractor):
         self.out_features = out_features
 
         # Load the DINOv2 model with registers
-        self.dino = Dinov2WithRegistersBackbone.from_pretrained(
-            dino_model, out_features=self.out_features
+        self.dino = Dinov2WithRegistersModel.from_pretrained(
+            dino_model, out_features=out_features, reshape_hidden_states=True
         )
 
         self.patch_size: int = self.dino.config.patch_size
@@ -44,13 +45,16 @@ class DinoFeatureExtractor(BaseFeatureExtractor):
 
         self.feat_channels = self.num_features * self.hidden_size
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, ...]:
         # Transform images to the right format
         inputs = self.image_processor(images=x, return_tensors="pt", do_rescale=False)
         inputs = {k: v.to(x.device) for k, v in inputs.items()}
 
         # Extract features from the DINOv2 model
-        outputs = self.dino(**inputs)
-        feat_maps = torch.cat(outputs.feature_maps, dim=1)
+        outputs = self.dino(**inputs, output_hidden_states=True)
+        hidden_states: tuple[torch.Tensor, ...] = outputs.hidden_states
+        hidden_states = tuple(
+            hs[:, 5:, :] for i, hs in enumerate(hidden_states) if i in [2, 5, 8, 11]
+        )  # Skip CLS + Register tokens
 
-        return feat_maps
+        return hidden_states

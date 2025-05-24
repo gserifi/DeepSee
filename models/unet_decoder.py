@@ -49,12 +49,18 @@ class UNetDecoder(BaseDecoder):
             padding=0,
         )
 
-    def forward(self, x: torch.Tensor, feats: torch.Tensor) -> torch.Tensor:
-        """
-        :param x: Input images of shape (B, 3, H, W)
-        :param feats: Feature maps with self.feat_channels channels
-        :return: Depth map of shape (B, 1, H, W)
-        """
+    def forward(
+        self, x: torch.Tensor, feats: tuple[torch.Tensor, ...]
+    ) -> tuple[torch.Tensor]:
+        feats = torch.cat(feats, dim=-1)
+        feats = feats.permute(0, 2, 1).reshape(
+            (
+                feats.shape[0],
+                feats.shape[-1],
+                self.feature_shape[1],
+                self.feature_shape[2],
+            )
+        )
 
         # At each step, downsample the input image to the size of the feature maps at that level and run the
         # concatenation through a convolutional layer, followed by upsampling and activation
@@ -83,4 +89,4 @@ class UNetDecoder(BaseDecoder):
         # Map the depth to a range of 0 to 10 meters, as stated in the project description
         depth = torch.sigmoid(depth) * 10
 
-        return depth
+        return depth, torch.zeros_like(depth)

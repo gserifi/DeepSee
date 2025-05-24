@@ -17,7 +17,15 @@ class BaseDecoder(lit.LightningModule):
         self.save_hyperparameters()
         self.feature_shape = feature_shape
 
-    def forward(self, x: torch.Tensor, feats: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, feats: tuple[torch.Tensor, ...]
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        :param x: Input images of shape (B, 3, H, W)
+        :param feats: Tuple of feature maps of shape (B, FD, PH, PW)
+        :return: Depth map and log variance of shape (B, 1, H, W)
+        """
+
         raise NotImplementedError(
             "The forward method must be implemented in the subclass"
         )

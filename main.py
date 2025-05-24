@@ -1,12 +1,12 @@
 from datetime import datetime
 from pathlib import Path
 
-from jsonargparse import lazy_instance
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.cli import ArgsType, LightningCLI
 
 from base_model import LitBaseModel
 from data_module import LitDataModule
+from losses import *  # Losses need to be imported for the CLI to work
 from models import *  # Models need to be imported for the CLI to work
 
 
