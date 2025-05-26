@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 from transformers import AutoImageProcessor, AutoModelForDepthEstimation
 
-from base_model import ImageAndDepthDatasetItemType, LitBaseModel
+from base_model import ImageAndDepthDatasetItem, LitBaseModel
 
 
 class PretrainedDepthAnythingV2(LitBaseModel):
@@ -42,7 +42,7 @@ class PretrainedDepthAnythingV2(LitBaseModel):
 
         return depth
 
-    def training_step(self, batch: ImageAndDepthDatasetItemType, batch_idx: int):
+    def training_step(self, batch: ImageAndDepthDatasetItem, batch_idx: int):
         """
         Model should not be used for training
         """

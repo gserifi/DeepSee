@@ -19,6 +19,7 @@ model:
         feature_projection_dim: 128
         use_feature_projection: true # set to false for slicing instead of projecting
         freeze_non_head_layers: false
+        feature_attention_list: [0]
     loss_fns:
       - - class_path: NLLLoss
           init_args: { }
