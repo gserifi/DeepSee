@@ -51,7 +51,7 @@ class UNetDecoder(BaseDecoder):
 
     def forward(
         self, x: torch.Tensor, feats: tuple[torch.Tensor, ...]
-    ) -> tuple[torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         feats = torch.cat(feats, dim=-1)
         feats = feats.permute(0, 2, 1).reshape(
             (
