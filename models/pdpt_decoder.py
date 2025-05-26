@@ -294,9 +294,11 @@ class CrossAttentionBlock(torch.nn.Module):
         )
         self.norm = torch.nn.LayerNorm(dim)
 
-    def forward(self, query: torch.Tensor, key_value: torch.Tensor):
+    def forward(
+        self, query: torch.Tensor, key_value: torch.Tensor, residual: torch.Tensor
+    ):
         out, _ = self.mha(query=query, key=key_value, value=key_value)
-        return self.norm(out + query)
+        return self.norm(residual + out)
 
 
 class PDPTDecoder(BaseDecoder):
@@ -321,6 +323,7 @@ class PDPTDecoder(BaseDecoder):
         use_residual: bool = True,
         feature_attention_list: list[int] = None,
         query_mode: Literal["image", "feat"] = "feat",
+        attention_residual: Literal["image", "feat"] = "feat",
     ):
         """
         :param feature_shape: (feature channels, patches in height, patches in width)
@@ -439,6 +442,7 @@ class PDPTDecoder(BaseDecoder):
                     param.requires_grad = False
 
         self.query_mode = query_mode
+        self.attention_residual = attention_residual
         self.ph, self.pw = 14, 14  # 14x14 pixels per patch
         self.image_processor = AutoImageProcessor.from_pretrained(
             "facebook/dinov2-with-registers-base",
@@ -483,12 +487,6 @@ class PDPTDecoder(BaseDecoder):
 
         # Apply cross attention to the first image token
         if len(self.feature_attention_list) >= 1:
-            # rgb_feats = self.rgb_encoder(x)
-            # rgb_feats = (
-            #     F.adaptive_avg_pool2d(rgb_feats, (self.n_patches_h, self.n_patches_w))
-            #     .flatten(2)
-            #     .permute(0, 2, 1)
-            # )
             rgb_feats = self.image_processor(
                 images=x, return_tensors="pt", do_rescale=False
             )
@@ -510,10 +508,20 @@ class PDPTDecoder(BaseDecoder):
                 tokens = feat.flatten(2).permute(
                     0, 2, 1
                 )  # (B, n_patches_h * n_patches_w, C)
+
+                if self.attention_residual == "feat":
+                    res = tokens
+                elif self.attention_residual == "image":
+                    res = rgb_feats
+                else:
+                    raise ValueError(
+                        f"Unknown attention residual: {self.attention_residual}"
+                    )
+
                 if self.query_mode == "image":
-                    tokens = self.cross_attentions[str(i)](rgb_feats, tokens)
+                    tokens = self.cross_attentions[str(i)](rgb_feats, tokens, res)
                 elif self.query_mode == "feat":
-                    tokens = self.cross_attentions[str(i)](tokens, rgb_feats)
+                    tokens = self.cross_attentions[str(i)](tokens, rgb_feats, res)
                 else:
                     raise ValueError(f"Unknown query mode: {self.query_mode}")
 
