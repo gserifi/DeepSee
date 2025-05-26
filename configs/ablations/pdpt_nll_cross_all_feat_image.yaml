@@ -1,0 +1,36 @@
+# lightning.pytorch==2.5.1
+seed_everything: 0
+trainer:
+  log_every_n_steps: 400
+  max_epochs: 25
+model:
+  class_path: FeatureDecoder
+  init_args:
+    feature_extractor:
+      class_path: DinoFeatureExtractor
+      init_args:
+        out_features: ["stage2", "stage5", "stage8", "stage11"]
+        dino_model: "facebook/dinov2-with-registers-small"
+    decoder:
+      class_path: PDPTDecoder
+      init_args:
+        feature_shape: [384, 30, 40] # 3'072 = 4 * 768 feature channels
+        feature_dim: 128
+        feature_projection_dim: 128
+        use_feature_projection: true # set to false for slicing instead of projecting
+        freeze_non_head_layers: false
+        use_residual: false
+        feature_attention_list: [0, 1, 2, 3]
+        query_mode: "feat"
+        attention_residual: "image"
+    loss_fns:
+      - - class_path: NLLLoss
+          init_args: { }
+        - 1.0
+data:
+  data_root: data
+  batch_size: 12
+  num_workers: 16
+  persistent_workers: true
+  pin_memory: true
+ckpt_path: null

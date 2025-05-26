@@ -1,0 +1,32 @@
+# lightning.pytorch==2.5.1
+seed_everything: 0
+trainer:
+  log_every_n_steps: 400
+  max_epochs: 25
+model:
+  class_path: FeatureDecoder
+  init_args:
+    feature_extractor:
+      class_path: DinoFeatureExtractor
+      init_args:
+        out_features: ["stage2", "stage5", "stage8", "stage11"]
+        dino_model: "facebook/dinov2-with-registers-small"
+    decoder:
+      class_path: PTransformerDecoder
+      init_args:
+        feature_shape: [1536, 30, 40] # 1'536 = 4 * 384 feature channels
+        decoder_dim: 2
+        nhead: 4
+        num_layers: 3
+        tgt_mode: learned
+    loss_fns:
+      - - class_path: NLLLoss
+          init_args: { }
+        - 1.0
+data:
+  data_root: data
+  batch_size: 12
+  num_workers: 16
+  persistent_workers: true
+  pin_memory: true
+ckpt_path: null
