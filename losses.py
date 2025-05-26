@@ -1,3 +1,4 @@
+import warnings
 from dataclasses import dataclass
 
 import torch
@@ -79,7 +80,11 @@ class SiLogLoss(BaseLoss):
         self.lambd = lambd
         self.zero_punish = zero_punish
 
-        raise Warning("SiLogLoss has not been rigorously tested. Use with caution!")
+        # raise Warning("SiLogLoss has not been rigorously tested. Use with caution!")
+        warnings.warn(
+            "SiLogLoss has not been rigorously tested. Use with caution!",
+            UserWarning,
+        )
 
     def forward(
         self,
@@ -154,6 +159,25 @@ class NLLLogLoss(BaseLoss):
         pred_logvar = query_record.pred_logvar
 
         diff_log = torch.log(gt_depth) - torch.log(pred_depth)
+
+        loss = 0.5 * torch.exp(-pred_logvar) * diff_log**2 + 0.5 * pred_logvar
+        return loss.mean()
+
+
+class NLLSiLogLoss(BaseLoss):
+    """
+    Negative Log Likelihood Loss assuming SiLogLoss in place of Euclidean distance.
+    """
+
+    def __init__(self, lambd=0.5, zero_punish=1e6):
+        # @TODO: Maybe add regularization term and variance penalty term
+        super().__init__()
+        self.silogloss = SiLogLoss(lambd, zero_punish)
+
+    def forward(self, query_record: LossQueryRecord):
+        pred_logvar = query_record.pred_logvar
+
+        diff_log = self.silogloss(query_record)
 
         loss = 0.5 * torch.exp(-pred_logvar) * diff_log**2 + 0.5 * pred_logvar
         return loss.mean()

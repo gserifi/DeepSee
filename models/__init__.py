@@ -5,4 +5,5 @@ from models.dpt_decoder import DPTDecoder
 from models.feature_decoder import FeatureDecoder
 from models.pdpt_decoder import PDPTDecoder
 from models.pre_depth_anything_v2 import PretrainedDepthAnythingV2
+from models.pt_decoder import PTransformerDecoder
 from models.unet_decoder import UNetDecoder
