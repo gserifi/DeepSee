@@ -1,7 +1,9 @@
-from typing import Sequence
+from typing import Literal, Sequence
 
+import einops
 import torch
 import torch.nn.functional as F
+from transformers import AutoImageProcessor
 
 from models.base_decoder import BaseDecoder
 
@@ -177,29 +179,43 @@ class DepthHead(torch.nn.Module):
     """
 
     def __init__(
-        self, in_channels: int, patch_h: int, patch_w: int, max_depth: int = 10
+        self,
+        in_channels: int,
+        patch_h: int,
+        patch_w: int,
+        max_depth: int = 10,
+        use_residual: bool = False,
     ):
         """
         :param in_channels: Number of input channels (feature channels from DPT)
         :param patch_h: Number of patches in height
         :param patch_w: Number of patches in width
         :param max_depth: Maximum depth value (10 meters as per project description)
+        :param use_residual: If true, use residual connection with the input image tensor.
         """
         super().__init__()
         self.n_patch_h = patch_h
         self.n_patch_w = patch_w
+        self.use_residual = use_residual
         self.max_depth = max_depth
         self.conv1 = torch.nn.Conv2d(
             in_channels, in_channels // 2, kernel_size=3, stride=1, padding=1
         )
+
+        out_channels = in_channels // 2
+        if use_residual:
+            out_channels += 3
+
         self.conv_block_2 = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels // 2, 32, kernel_size=3, stride=1, padding=1),
+            torch.nn.Conv2d(out_channels, 32, kernel_size=3, stride=1, padding=1),
             torch.nn.ReLU(inplace=True),
             torch.nn.Conv2d(32, 1, kernel_size=1, stride=1, padding=0),
             torch.nn.Sigmoid(),
         )
 
-    def forward(self, x: torch.Tensor, output_dim: Sequence[int]) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, output_dim: Sequence[int], residual: torch.Tensor = None
+    ) -> torch.Tensor:
         x = self.conv1(x)
         x = F.interpolate(
             x,
@@ -207,6 +223,15 @@ class DepthHead(torch.nn.Module):
             mode="bilinear",
             align_corners=True,
         )
+
+        if self.use_residual and residual is not None:
+            residual = F.interpolate(
+                residual,
+                size=(self.n_patch_h * 14, self.n_patch_w * 14),
+                mode="nearest",
+            )
+            x = torch.cat((x, residual), dim=1)
+
         depth = self.conv_block_2(x)
 
         depth = depth * self.max_depth
@@ -261,6 +286,21 @@ class LogVarHead(torch.nn.Module):
         return logvar
 
 
+class CrossAttentionBlock(torch.nn.Module):
+    def __init__(self, dim, heads=4):
+        super().__init__()
+        self.mha = torch.nn.MultiheadAttention(
+            embed_dim=dim, num_heads=heads, batch_first=True
+        )
+        self.norm = torch.nn.LayerNorm(dim)
+
+    def forward(
+        self, query: torch.Tensor, key_value: torch.Tensor, residual: torch.Tensor
+    ):
+        out, _ = self.mha(query=query, key=key_value, value=key_value)
+        return self.norm(residual + out)
+
+
 class PDPTDecoder(BaseDecoder):
     """
     Probabilistic DPT decoder, based on:
@@ -279,6 +319,11 @@ class PDPTDecoder(BaseDecoder):
         feature_projection_dim: int = 128,
         use_feature_projection: bool = True,
         debug: bool = False,
+        freeze_non_head_layers: bool = False,
+        use_residual: bool = True,
+        feature_attention_list: list[int] = None,
+        query_mode: Literal["image", "feat"] = "feat",
+        attention_residual: Literal["image", "feat"] = "feat",
     ):
         """
         :param feature_shape: (feature channels, patches in height, patches in width)
@@ -288,11 +333,21 @@ class PDPTDecoder(BaseDecoder):
         :param feature_projection_dim: Dimension of the feature projection layer / feature slicing.
         :param use_feature_projection: If true, use a linear layer to project the features, otherwise do slicing.
         :param debug: If true, print debug information.
+        :param freeze_non_head_layers: If true, freeze all layers except the depth and logvar heads.
+        :param use_residual: If true, use residual connection with the input image tensor.
+        :param feature_attention_list: List of feature attention blocks to apply cross attention to.
+                                       If empty, no cross attention is applied.
+        :param query_mode: Query mode for cross attention, either "image" or "feat".
         """
         super().__init__(feature_shape)
 
         self.feature_projection_dim = feature_projection_dim
         self.use_feature_projection = use_feature_projection
+        self.freeze_non_head_layers = freeze_non_head_layers
+        self.use_residual = use_residual
+        self.feature_attention_list = (
+            feature_attention_list if feature_attention_list else []
+        )
 
         self.debug = debug
 
@@ -353,6 +408,7 @@ class PDPTDecoder(BaseDecoder):
             in_channels=feature_dim,
             patch_h=self.n_patches_h,
             patch_w=self.n_patches_w,
+            use_residual=self.use_residual,
         )
 
         # Log variance head: Predicts the log variance of the depth map (ours).
@@ -370,6 +426,37 @@ class PDPTDecoder(BaseDecoder):
                 stride=1,
                 padding=0,
             )
+
+        # self.rgb_encoder = torch.nn.Conv2d(3, self.feature_projection_dim, 3, padding=1)
+        self.cross_attentions = torch.nn.ModuleDict(
+            {
+                str(i): CrossAttentionBlock(dim=self.feature_projection_dim)
+                for i in self.feature_attention_list
+            }
+        )
+
+        if self.freeze_non_head_layers:
+            # Freeze all layers except the depth and logvar heads
+            for name, param in self.named_parameters():
+                if "depth_head" not in name and "logvar_head" not in name:
+                    param.requires_grad = False
+
+        self.query_mode = query_mode
+        self.attention_residual = attention_residual
+        self.ph, self.pw = 14, 14  # 14x14 pixels per patch
+        self.image_processor = AutoImageProcessor.from_pretrained(
+            "facebook/dinov2-with-registers-base",
+            use_fast=True,
+            crop_size={
+                "height": self.n_patches_h * self.ph,
+                "width": self.n_patches_w * self.pw,
+            },
+            size={"shortest_edge": self.n_patches_h * self.ph},
+        )
+
+        self.image_proj = torch.nn.Conv1d(
+            3 * self.ph * self.pw, self.feature_projection_dim, kernel_size=1
+        )
 
     def forward(
         self, x: torch.Tensor, feats: tuple[torch.Tensor, ...]
@@ -398,6 +485,52 @@ class PDPTDecoder(BaseDecoder):
         if self.feature_projection:
             feats = tuple(map(self.feature_projection, feats))
 
+        # Apply cross attention to the first image token
+        if len(self.feature_attention_list) >= 1:
+            rgb_feats = self.image_processor(
+                images=x, return_tensors="pt", do_rescale=False
+            )
+            rgb_feats = rgb_feats["pixel_values"].to(x.device)
+            rgb_feats = einops.rearrange(
+                rgb_feats,
+                "b c (h ph) (w pw) -> b (h w) (c ph pw)",
+                h=self.n_patches_h,
+                w=self.n_patches_w,
+                ph=self.ph,
+                pw=self.pw,
+                c=x.size(1),
+            )
+            rgb_feats = self.image_proj(rgb_feats.permute(0, 2, 1)).permute(0, 2, 1)
+
+        processed_feats = []
+        for i, feat in enumerate(feats):
+            if i in self.feature_attention_list:
+                tokens = feat.flatten(2).permute(
+                    0, 2, 1
+                )  # (B, n_patches_h * n_patches_w, C)
+
+                if self.attention_residual == "feat":
+                    res = tokens
+                elif self.attention_residual == "image":
+                    res = rgb_feats
+                else:
+                    raise ValueError(
+                        f"Unknown attention residual: {self.attention_residual}"
+                    )
+
+                if self.query_mode == "image":
+                    tokens = self.cross_attentions[str(i)](rgb_feats, tokens, res)
+                elif self.query_mode == "feat":
+                    tokens = self.cross_attentions[str(i)](tokens, rgb_feats, res)
+                else:
+                    raise ValueError(f"Unknown query mode: {self.query_mode}")
+
+                feat = tokens.permute(0, 2, 1).reshape(
+                    B, self.feature_projection_dim, self.n_patches_h, self.n_patches_w
+                )
+            processed_feats.append(feat)
+        feats = tuple(processed_feats)
+
         # Reassemble the features
         # (B, feature_projection, patch_h, patch_w) -> (B, DAV2_feautre_dim, patch_h * scale, patch_w * scale)
         x1 = self.reassemble_block1(feats[0])  # Scale 4.0
@@ -424,7 +557,7 @@ class PDPTDecoder(BaseDecoder):
             print(f"Fusion block 1: {x1.shape}")
 
         # Final output, shape is passed for bilinear interpolation to original size
-        depth = self.depth_head(x1, x.shape[2:])
+        depth = self.depth_head(x1, x.shape[2:], residual=x)
         logvar = self.logvar_head(x1, x.shape[2:])
 
         return depth, logvar
