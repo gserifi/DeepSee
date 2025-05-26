@@ -24,7 +24,7 @@ class PretrainedDepthAnythingV2(LitBaseModel):
         self.image_processor = AutoImageProcessor.from_pretrained(depth_anything_model)
         self.model = AutoModelForDepthEstimation.from_pretrained(depth_anything_model)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         # Transform images to the right format
         inputs = self.image_processor(images=x, return_tensors="pt", do_rescale=False)
         inputs = {k: v.to(x.device) for k, v in inputs.items()}
@@ -40,7 +40,7 @@ class PretrainedDepthAnythingV2(LitBaseModel):
             align_corners=False,
         )
 
-        return depth
+        return depth, torch.zeros_like(depth)
 
     def training_step(self, batch: ImageAndDepthDatasetItem, batch_idx: int):
         """
