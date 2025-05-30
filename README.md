@@ -27,7 +27,7 @@ source .venv/bin/activate
 ### Install PyTorch and PyTorch Lightning
 
 ```bash
-pip install torch torchvision lightning 'jsonargparse[signatures]'
+pip install torch torchvision lightning jsonargparse[signatures]
 ```
 
 ### Install Remaining Dependencies
@@ -85,7 +85,7 @@ python3 main.py test -c configs/<config>.yaml --ckpt_path <path_to_checkpoint>
 ```
 
 The checkpoint path has to point to a valid checkpoint file (has to have been trained with the same config YAML file)
-in the `logs` folder. The format looks like this: `logs/<yyyy-mm-dd>/<hh-mm-ss>/checkpoints/<ckpt_name>.ckpt`
+in the `logs` folder. The format looks like this: `logs/<yyyy-mm-dd>/<hh-mm-ss>/checkpoints/<epoch>.ckpt`
 
 This script evaluates the model our own custom holdout test set and prints the respective metrics.
 
