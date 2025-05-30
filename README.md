@@ -24,10 +24,10 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-### Install PyTorch
+### Install PyTorch and PyTorch Lightning
 
 ```bash
-pip install torch torchvision
+pip install torch torchvision lightning 'jsonargparse[signatures]'
 ```
 
 ### Install Remaining Dependencies
